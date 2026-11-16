@@ -16,7 +16,9 @@ const questions = [
 const $ = id => document.getElementById(id);
 const answerOptions = ['A', 'B', 'C', 'D'];
 const medals = ['🥇', '🥈', '🥉'];
+const mockUsers = ['Minh Anh', 'Tuấn Kiệt', 'Hoàng Nam', 'Bảo Ngọc', 'Bạn (Test)'];
 const maxChatMessages = 100;
+let mockUserIndex = 0;
 let currentIdx = 0;
 let timeLeft = 20;
 let timerInterval = null;
@@ -29,6 +31,15 @@ let currentVotes = Object.create(null);
 let participants = new Map();
 let ws = null;
 
+function setGameState(state) {
+  gameState = state;
+  $('pauseButton').disabled = !['running', 'paused'].includes(state);
+  $('nextButton').disabled = gameState !== 'running';
+  $('endButton').disabled = !['running', 'paused'].includes(state);
+  $('pauseButton').textContent = state === 'paused' ? 'Tiếp tục' : 'Tạm dừng';
+  $('ticker').dataset.state = state;
+}
+
 function startGame() {
   clearInterval(timerInterval);
   clearTimeout(nextQuestionTimeout);
@@ -36,6 +47,7 @@ function startGame() {
   timeLeft = 20;
   currentVotes = Object.create(null);
   participants = new Map();
+  mockUserIndex = 0;
   pausedFrom = null;
   $('chatHistory').replaceChildren();
   $('startScreen').style.display = 'none';
@@ -44,14 +56,6 @@ function startGame() {
   renderLeaderboard();
   setGameState('running');
   loadQuestion();
-}
-
-function setGameState(state) {
-  gameState = state;
-  $('pauseButton').disabled = !['running', 'paused'].includes(state);
-  $('endButton').disabled = !['running', 'paused'].includes(state);
-  $('pauseButton').textContent = state === 'paused' ? 'Tiếp tục' : 'Tạm dừng';
-  $('ticker').dataset.state = state;
 }
 
 function loadQuestion() {
@@ -159,7 +163,7 @@ function revealAnswer() {
   if (gameState !== 'running') return;
   isAcceptingAnswers = false;
   const correct = questions[currentIdx].ans;
-  answerOptions.forEach(option => $( `opt-${option}`).classList.add(option === correct ? 'correct' : 'wrong'));
+  answerOptions.forEach(option => $(`opt-${option}`).classList.add(option === correct ? 'correct' : 'wrong'));
   let winners = 0;
   Object.entries(currentVotes).forEach(([id, vote]) => {
     if (vote.choice !== correct) return;
@@ -177,6 +181,17 @@ function revealAnswer() {
 function advanceQuestion() {
   nextQuestionTimeout = null;
   if (gameState !== 'running') return;
+  currentIdx += 1;
+  loadQuestion();
+}
+
+function nextQuestionNow() {
+  if (gameState !== 'running') return;
+  if (isAcceptingAnswers) revealAnswer();
+  else {
+    clearTimeout(nextQuestionTimeout);
+    nextQuestionTimeout = null;
+  }
   currentIdx += 1;
   loadQuestion();
 }
@@ -273,10 +288,12 @@ function renderParticipants() {
 
 function simulateChat() {
   const input = $('simInput');
-  if (!input.value.trim()) return;
-  const names = ['Minh Anh', 'Tuấn Kiệt', 'Hoàng Nam', 'Bảo Ngọc', 'Bạn (Test)'];
-  const name = names[Math.floor(Math.random() * names.length)];
-  handleIncomingComment(name, name, input.value);
+  const text = input.value.trim();
+  if (!text) return;
+
+  const name = mockUsers[mockUserIndex % mockUsers.length];
+  mockUserIndex += 1;
+  handleIncomingComment(`mock-${name}-${mockUserIndex}`, name, text);
   input.value = '';
   input.focus();
 }
@@ -330,6 +347,7 @@ function connectTikTok() {
 
 $('startButton').addEventListener('click', startGame);
 $('pauseButton').addEventListener('click', togglePause);
+$('nextButton').addEventListener('click', nextQuestionNow);
 $('endButton').addEventListener('click', () => finishGame());
 $('configButton').addEventListener('click', openModal);
 $('closeModalButton').addEventListener('click', closeModal);
