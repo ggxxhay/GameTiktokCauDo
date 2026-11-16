@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ai Là Triệu Phú - TikTok Live</title>
+    <style>
+        :root {
+            --bg-dark: #090d24;
+            --bg-card: #131b47;
+            --border-gold: #f5b942;
+            --accent-blue: #2345a8;
+            --correct: #1fa855;
+            --wrong: #d9383a;
+            --text-light: #ffffff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body {
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-light);
+            overflow: hidden;
+        }
+
+        /* Khung tỷ lệ 9:16 chuẩn TikTok Live */
+        .live-container {
+            width: 100vw;
+            max-width: 450px;
+            height: 100vh;
+            max-height: 850px;
+            background: radial-gradient(circle at top, #1b286b 0%, var(--bg-dark) 80%);
+            border: 2px solid #2a398a;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 16px;
+            position: relative;
+        }
+
+        /* Header & Trạng thái kết nối */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 8px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(245, 185, 66, 0.4);
+        }
+
+        .status-dot {
+            height: 10px; width: 10px;
+            background-color: #ff9800;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .status-dot.connected { background-color: #00e676; box-shadow: 0 0 8px #00e676; }
+
+        .btn-config {
+            background: var(--border-gold);
+            color: #000;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Bảng xếp hạng Top 3 */
+        .leaderboard {
+            background: rgba(19, 27, 71, 0.85);
+            border: 1px solid var(--border-gold);
+            border-radius: 12px;
+            padding: 10px;
+            margin-top: 8px;
+        }
+        .leaderboard h3 {
+            font-size: 13px;
+            text-align: center;
+            color: var(--border-gold);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .top-list {
+            display: flex;
+            justify-content: space-around;
+            font-size: 12px;
+        }
+        .top-item {
+            text-align: center;
+            background: rgba(255,255,255,0.08);
+            padding: 6px 8px;
+            border-radius: 8px;
+            width: 31%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .top-item span { display: block; font-weight: bold; color: #ffd54f; font-size: 14px; }
+
+        /* Đồng hồ & Số câu */
+        .timer-section {
+            text-align: center;
+            margin: 10px 0;
+        }
+        .question-badge {
+            background: var(--border-gold);
+            color: #000;
+            padding: 3px 14px;
+            border-radius: 15px;
+            font-weight: 800;
+            font-size: 13px;
+            display: inline-block;
+            margin-bottom: 6px;
+        }
+        .timer-circle {
+            width: 54px; height: 54px;
+            border-radius: 50%;
+            border: 3px solid var(--border-gold);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            font-size: 22px;
+            font-weight: bold;
+            background: var(--bg-card);
+            box-shadow: 0 0 15px rgba(245, 185, 66, 0.3);
+        }
+
+        /* Khung Câu hỏi */
+        .question-box {
+            background: linear-gradient(180deg, #1a2766 0%, #0e153d 100%);
+            border: 2px solid var(--border-gold);
+            border-radius: 16px;
+            padding: 18px 14px;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 600;
+            line-height: 1.4;
+            min-height: 105px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+        }
+
+        /* Các lựa chọn A B C D */
+        .options-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 12px 0;
+        }
+
+        .option-btn {
+            position: relative;
+            background: var(--bg-card);
+            border: 2px solid #3c54b8;
+            border-radius: 25px;
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: left;
+            overflow: hidden;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s, border-color 0.3s;
+        }
+
+        .option-btn .prefix {
+            color: var(--border-gold);
+            font-weight: 800;
+            margin-right: 8px;
+        }
+
+        /* Thanh tiến trình % vote của người xem */
+        .vote-bar {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 0%;
+            background: rgba(245, 185, 66, 0.25);
+            z-index: 0;
+            transition: width 0.3s ease;
+        }
+
+        .option-content, .vote-percent { position: relative; z-index: 1; }
+        .vote-percent { font-size: 13px; color: #ffd54f; font-weight: bold; }
+
+        /* Hiệu ứng đúng / sai */
+        .option-btn.correct { background: var(--correct) !important; border-color: #72ffab !important; transform: scale(1.02); }
+        .option-btn.wrong { background: var(--wrong) !important; border-color: #ff8a8a !important; opacity: 0.7; }
+
+        /* Dòng thông báo & Chạy thử */
+        .ticker {
+            text-align: center;
+            font-size: 13px;
+            color: #a5b4fc;
+            height: 20px;
+            overflow: hidden;
+        }
+
+        .sim-bar {
+            display: flex;
+            gap: 6px;
+            background: rgba(255,255,255,0.1);
+            padding: 8px;
+            border-radius: 12px;
+        }
+        .sim-bar input {
+            flex: 1;
+            background: #090d24;
+            border: 1px solid #3c54b8;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .sim-bar button {
+            background: var(--accent-blue);
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Modal Cài đặt TikTok */
+        .modal {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-content {
+            background: var(--bg-card);
+            border: 2px solid var(--border-gold);
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+        }
+        .modal-content h2 { font-size: 18px; color: var(--border-gold); margin-bottom: 12px; }
+        .modal-content label { display: block; font-size: 12px; margin-bottom: 4px; color: #ccc; }
+        .modal-content input {
+            width: 100%; padding: 8px; margin-bottom: 12px;
+            border-radius: 8px; border: 1px solid #3c54b8;
+            background: #090d24; color: #fff;
+        }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+
+<div class="live-container">
+    <!-- Header -->
+    <div>
+        <div class="header">
+            <div>
+                <span id="statusDot" class="status-dot"></span>
+                <span id="statusText" style="font-size: 12px; font-weight: bold;">Chế độ Chạy Thử</span>
+            </div>
+            <button class="btn-config" onclick="openModal()">⚙️ Kết nối Live</button>
+        </div>
+
+        <!-- Bảng xếp hạng -->
+        <div class="leaderboard">
+            <h3>🏆 Top Thông Thái</h3>
+            <div class="top-list" id="topList">
+                <div class="top-item">Chưa có<span>0 đ</span></div>
+                <div class="top-item">Chưa có<span>0 đ</span></div>
+                <div class="top-item">Chưa có<span>0 đ</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Đồng hồ & Câu hỏi -->
+    <div>
+        <div class="timer-section">
+            <div class="question-badge" id="qNumber">CÂU 1 / 10</div>
+            <div class="timer-circle" id="timer">20</div>
+        </div>
+
+        <div class="question-box" id="questionText">
+            Đang tải câu hỏi...
+        </div>
+
+        <!-- 4 Đáp án -->
+        <div class="options-grid">
+            <div class="option-btn" id="opt-A">
+                <div class="vote-bar" id="bar-A"></div>
+                <div class="option-content"><span class="prefix">A:</span><span id="text-A">...</span></div>
+                <div class="vote-percent" id="pct-A">0%</div>
+            </div>
+            <div class="option-btn" id="opt-B">
+                <div class="vote-bar" id="bar-B"></div>
+                <div class="option-content"><span class="prefix">B:</span><span id="text-B">...</span></div>
+                <div class="vote-percent" id="pct-B">0%</div>
+            </div>
+            <div class="option-btn" id="opt-C">
+                <div class="vote-bar" id="bar-C"></div>
+                <div class="option-content"><span class="prefix">C:</span><span id="text-C">...</span></div>
+                <div class="vote-percent" id="pct-C">0%</div>
+            </div>
+            <div class="option-btn" id="opt-D">
+                <div class="vote-bar" id="bar-D"></div>
+                <div class="option-content"><span class="prefix">D:</span><span id="text-D">...</span></div>
+                <div class="vote-percent" id="pct-D">0%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer: Thông báo & Giả lập -->
+    <div>
+        <div class="ticker" id="ticker">👉 Gõ A, B, C hoặc D trên chat để trả lời!</div>
+        <div class="sim-bar" id="simBar">
+            <input type="text" id="simInput" placeholder="Test gõ A, B, C, D..." maxlength="10">
+            <button onclick="simulateChat()">Gửi</button>
+        </div>
+    </div>
+
+    <!-- Modal Cấu hình EulerStream -->
+    <div class="modal" id="configModal">
+        <div class="modal-content">
+            <h2>Kết nối TikTok Live</h2>
+            <label>TikTok Username (không cần @):</label>
+            <input type="text" id="ttUser" placeholder="ví dụ: user12345">
+            <label>EulerStream API Key (Miễn phí):</label>
+            <input type="text" id="ttApiKey" placeholder="Dán API Key vào đây...">
+            <p style="font-size: 11px; color: #aaa; margin-bottom: 12px;">
+                *Đăng ký tài khoản miễn phí tại <b>eulerstream.com</b> để lấy API Key kết nối trực tiếp không cần server.
+            </p>
+            <div class="modal-actions">
+                <button class="btn-config" style="background:#555; color:#fff;" onclick="closeModal()">Đóng</button>
+                <button class="btn-config" onclick="connectTikTok()">Kết nối ngay</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. DANH SÁCH 10 CÂU HỎI MẪU
+    const questions = [
+        { q: "Đâu là tên một loại bánh truyền thống nổi tiếng của Việt Nam dịp Tết?", A: "Bánh Tét", B: "Bánh Mì", C: "Bánh Xèo", D: "Bánh Cuốn", ans: "A" },
+        { q: "Con vật nào sau đây không nằm trong 12 con giáp của Việt Nam?", A: "Con Mèo", B: "Con Trâu", C: "Con Thỏ", D: "Con Rồng", ans: "C" },
+        { q: "Đỉnh núi nào được mệnh danh là 'Nóc nhà Đông Dương'?", A: "Bà Đen", B: "Fansipan", C: "Langbiang", D: "Bạch Mã", ans: "B" },
+        { q: "Câu tục ngữ: 'Gần mực thì đen, gần đèn thì...' gì?", A: "Chói", B: "Nóng", C: "Sáng", D: "Rạng", ans: "C" },
+        { q: "Loại quả nào thường được dùng để nấu canh chua miền Nam?", A: "Quả Me", B: "Quả Sấu", C: "Quả Chanh", D: "Quả Khế", ans: "A" },
+        { q: "Ai là người lãnh đạo cuộc khởi nghĩa Lam Sơn chống quân Minh?", A: "Quang Trung", B: "Trần Hưng Đạo", C: "Lê Lợi", D: "Lý Thường Kiệt", ans: "C" },
+        { q: "Đơn vị tiền tệ chính thức của Nhật Bản là gì?", A: "Won", B: "Nhân dân tệ", C: "Baht", D: "Yên", ans: "D" },
+        { q: "Hành tinh nào gần Mặt Trời nhất trong Hệ Mặt Trời?", A: "Sao Kim", B: "Sao Thủy", C: "Sao Hỏa", D: "Trái Đất", ans: "B" },
+        { q: "Vịnh Hạ Long thuộc tỉnh nào của nước ta?", A: "Hải Phòng", B: "Thanh Hóa", C: "Quảng Ninh", D: "Nghệ An", ans: "C" },
+        { q: "Từ nào còn thiếu: 'Có công mài sắt, có ngày nên...'?", A: "Kim", B: "Dao", C: "Kéo", D: "Kiếm", ans: "A" }
+    ];
+
+    let currentIdx = 0;
+    let timeLeft = 20;
+    let timerInterval;
+    let isAcceptingAnswers = false;
+
+    // Lưu trữ vote của câu hiện tại: { userId: { name, choice } }
+    let currentVotes = {};
+    // Bảng điểm tổng: { userId: { name, score } }
+    let scores = {};
+    let ws = null;
+
+    // Bắt đầu câu hỏi
+    function loadQuestion() {
+        if (currentIdx >= questions.length) {
+            currentIdx = 0; // Lặp lại từ đầu khi hết 10 câu
+        }
+
+        const item = questions[currentIdx];
+        document.getElementById('qNumber').innerText = `CÂU ${currentIdx + 1} / ${questions.length}`;
+        document.getElementById('questionText').innerText = item.q;
+        
+        ['A', 'B', 'C', 'D'].forEach(opt => {
+            document.getElementById(`text-${opt}`).innerText = item[opt];
+            const btn = document.getElementById(`opt-${opt}`);
+            btn.classList.remove('correct', 'wrong');
+            document.getElementById(`bar-${opt}`).style.width = '0%';
+            document.getElementById(`pct-${opt}`).innerText = '0%';
+        });
+
+        currentVotes = {};
+        isAcceptingAnswers = true;
+        timeLeft = 20;
+        document.getElementById('timer').innerText = timeLeft;
+        document.getElementById('ticker').innerText = "👉 Gõ A, B, C hoặc D trên chat để trả lời!";
+
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                revealAnswer();
+            }
+        }, 1000);
+    }
+
+    // Xử lý khi có người bình luận
+    function handleIncomingComment(userId, nickname, text) {
+        if (!isAcceptingAnswers) return;
+
+        // Lấy ký tự đầu tiên in hoa (chấp nhận "A", "a", "A.", "Đáp án A" -> lọc đơn giản)
+        const clean = text.trim().toUpperCase();
+        let choice = null;
+        if (['A', 'B', 'C', 'D'].includes(clean)) {
+            choice = clean;
+        } else if (clean.startsWith('A ') || clean.startsWith('B ') || clean.startsWith('C ') || clean.startsWith('D ')) {
+            choice = clean[0];
+        }
+
+        if (!choice) return;
+
+        // Cập nhật lựa chọn của user (cho phép đổi ý trước khi hết giờ)
+        currentVotes[userId] = { name: nickname, choice: choice };
+        document.getElementById('ticker').innerText = `💬 ${nickname} vừa chọn đáp án ${choice}`;
+        updateVoteBars();
+    }
+
+    // Cập nhật thanh % bình chọn
+    function updateVoteBars() {
+        const counts = { A: 0, B: 0, C: 0, D: 0 };
+        let total = 0;
+
+        Object.values(currentVotes).forEach(v => {
+            counts[v.choice]++;
+            total++;
+        });
+
+        ['A', 'B', 'C', 'D'].forEach(opt => {
+            const pct = total === 0 ? 0 : Math.round((counts[opt] / total) * 100);
+            document.getElementById(`bar-${opt}`).style.width = `${pct}%`;
+            document.getElementById(`pct-${opt}`).innerText = `${pct}%`;
+        });
+    }
+
+    // Chốt đáp án & Cộng điểm
+    function revealAnswer() {
+        isAcceptingAnswers = false;
+        const correctOpt = questions[currentIdx].ans;
+
+        ['A', 'B', 'C', 'D'].forEach(opt => {
+            const btn = document.getElementById(`opt-${opt}`);
+            if (opt === correctOpt) {
+                btn.classList.add('correct');
+            } else {
+                btn.classList.add('wrong');
+            }
+        });
+
+        let winners = 0;
+        Object.entries(currentVotes).forEach(([uid, data]) => {
+            if (data.choice === correctOpt) {
+                winners++;
+                if (!scores[uid]) scores[uid] = { name: data.name, score: 0 };
+                scores[uid].score += 10;
+            }
+        });
+
+        document.getElementById('ticker').innerText = `🎉 Đáp án đúng là ${correctOpt}! Có ${winners} bạn trả lời đúng (+10đ)`;
+        updateLeaderboard();
+
+        // Chờ 5 giây rồi sang câu mới
+        setTimeout(() => {
+            currentIdx++;
+            loadQuestion();
+        }, 5000);
+    }
+
+    // Cập nhật Top 3
+    function updateLeaderboard() {
+        const sorted = Object.values(scores).sort((a, b) => b.score - a.score).slice(0, 3);
+        const topList = document.getElementById('topList');
+        topList.innerHTML = '';
+
+        for (let i = 0; i < 3; i++) {
+            const player = sorted[i];
+            const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : '🥉');
+            if (player) {
+                topList.innerHTML += `<div class="top-item">${medal} ${player.name}<span>${player.score} đ</span></div>`;
+            } else {
+                topList.innerHTML += `<div class="top-item">${medal} Trống<span>0 đ</span></div>`;
+            }
+        }
+    }
+
+    // Chức năng tự test trên điện thoại
+    function simulateChat() {
+        const input = document.getElementById('simInput');
+        if (!input.value) return;
+        const randomUsers = ['Minh Anh', 'Tuấn Kiệt', 'Hoàng Nam', 'Bảo Ngọc', 'Bạn (Test)'];
+        const user = randomUsers[Math.floor(Math.random() * randomUsers.length)];
+        handleIncomingComment(user, user, input.value);
+        input.value = '';
+    }
+
+    // Modal & Kết nối EulerStream WebSocket
+    function openModal() { document.getElementById('configModal').style.display = 'flex'; }
+    function closeModal() { document.getElementById('configModal').style.display = 'none'; }
+
+    function connectTikTok() {
+        const user = document.getElementById('ttUser').value.trim();
+        const apiKey = document.getElementById('ttApiKey').value.trim();
+        if (!user || !apiKey) {
+            alert("Vui lòng nhập đầy đủ Username và API Key!");
+            return;
+        }
+
+        if (ws) ws.close();
+        closeModal();
+
+        document.getElementById('statusText').innerText = "Đang kết nối...";
+        
+        // Kết nối WebSocket công khai của EulerStream
+        const wsUrl = `wss://ws.eulerstream.com?uniqueId=${encodeURIComponent(user)}&apiKey=${encodeURIComponent(apiKey)}`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            document.getElementById('statusDot').classList.add('connected');
+            document.getElementById('statusText').innerText = `Live: @${user}`;
+            document.getElementById('simBar').style.display = 'none'; // Ẩn thanh test khi đã lên live thật
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const payload = JSON.parse(event.data);
+                // Bắt sự kiện bình luận từ luồng dữ liệu
+                if (payload.
