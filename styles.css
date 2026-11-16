@@ -25,6 +25,7 @@ body {
 button, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .5; }
+[hidden] { display: none !important; }
 
 .live-container {
   position: relative;
@@ -40,7 +41,7 @@ button:disabled { cursor: not-allowed; opacity: .5; }
   background: radial-gradient(circle at top, #1b286b 0%, var(--bg) 80%);
 }
 
-.start-screen {
+.start-screen, .round-end-screen {
   position: absolute;
   z-index: 50;
   inset: 0;
@@ -52,8 +53,8 @@ button:disabled { cursor: not-allowed; opacity: .5; }
   background: rgba(9, 13, 36, .96);
   text-align: center;
 }
-.start-screen h1 { margin: 0 0 10px; color: var(--gold); font-size: 24px; text-transform: uppercase; }
-.start-screen p { margin: 0 0 20px; color: #a5b4fc; font-size: 13px; line-height: 1.5; }
+.start-screen h1, .round-end-screen h2 { margin: 0 0 10px; color: var(--gold); font-size: 24px; text-transform: uppercase; }
+.start-screen p, .round-end-screen p { margin: 0 0 20px; color: #a5b4fc; font-size: 13px; line-height: 1.5; }
 .btn-start {
   padding: 12px 30px;
   border: 0;
