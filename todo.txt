@@ -1,0 +1,14 @@
+Proxy API key cho TikTok Live (xem lại sau)
+
+- Không nhúng EulerStream API key vào index.html hoặc script.js; mã chạy trên trình duyệt không thể giữ bí mật.
+- GitHub Pages chỉ phục vụ file tĩnh, không thể giữ secret hay tự proxy WebSocket.
+- Cân nhắc Cloudflare Worker làm lớp trung gian serverless:
+  1. Lưu EulerStream API key dưới dạng Worker Secret, không commit secret vào repo.
+  2. Trình duyệt kết nối tới Worker; Worker xác thực/kiểm soát request rồi kết nối upstream EulerStream và relay sự kiện.
+  3. Giới hạn origin, xác thực client phù hợp, rate-limit và kiểm tra payload để tránh biến Worker thành open proxy.
+- `application/x-www-form-urlencoded` chỉ là cách mã hóa dữ liệu HTTP; không che giấu key và không thể thay thế cơ chế xác thực WebSocket.
+- Browser WebSocket API không hỗ trợ gửi request body hoặc tùy chỉnh header tùy ý trong handshake; cần thiết kế giao thức client-to-Worker phù hợp.
+- Trước khi triển khai, xác minh tài liệu EulerStream về endpoint, định dạng message, phương thức truyền API key và điều khoản sử dụng.
+- Việc cần làm: tạo Worker relay an toàn, cấu hình Secret qua dashboard/CLI, đổi frontend để kết nối Worker, kiểm tra kết nối/đóng/reconnect và không log key.
+
+Ghi chú: đây là TODO, chưa có proxy được triển khai và chưa xác nhận Worker tương thích với giao thức EulerStream hiện tại.
