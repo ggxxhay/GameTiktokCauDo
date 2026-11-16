@@ -24,144 +24,182 @@
             align-items: center;
             min-height: 100vh;
             color: var(--text-light);
-            overflow: hidden;
+            overflow-x: hidden;
         }
 
+        /* Khung co giãn linh hoạt cho cả dọc và ngang */
         .live-container {
             width: 100vw;
-            max-width: 450px;
+            max-width: 500px;
             height: 100vh;
-            max-height: 850px;
+            max-height: 900px;
             background: radial-gradient(circle at top, #1b286b 0%, var(--bg-dark) 80%);
             border: 2px solid #2a398a;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 14px;
+            padding: 12px;
             position: relative;
         }
+
+        /* Màn hình chờ bắt đầu chơi */
+        .start-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(9, 13, 36, 0.95);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
+        }
+        .start-screen h1 {
+            color: var(--border-gold);
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(245, 185, 66, 0.5);
+        }
+        .start-screen p {
+            font-size: 13px;
+            color: #a5b4fc;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .btn-start {
+            background: linear-gradient(180deg, #f5b942 0%, #d48806 100%);
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(245, 185, 66, 0.4);
+            transition: transform 0.2s;
+        }
+        .btn-start:active { transform: scale(0.95); }
 
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: rgba(0, 0, 0, 0.4);
-            padding: 6px 12px;
+            padding: 4px 10px;
             border-radius: 20px;
             border: 1px solid rgba(245, 185, 66, 0.4);
         }
 
         .status-dot {
-            height: 10px; width: 10px;
+            height: 8px; width: 8px;
             background-color: #ff9800;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 6px;
+            margin-right: 4px;
         }
-        .status-dot.connected { background-color: #00e676; box-shadow: 0 0 8px #00e676; }
+        .status-dot.connected { background-color: #00e676; box-shadow: 0 0 6px #00e676; }
 
         .btn-config {
             background: var(--border-gold);
             color: #000;
             border: none;
-            padding: 4px 10px;
-            border-radius: 12px;
+            padding: 3px 8px;
+            border-radius: 10px;
             font-weight: bold;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
         }
 
         .leaderboard {
             background: rgba(19, 27, 71, 0.85);
             border: 1px solid var(--border-gold);
-            border-radius: 12px;
-            padding: 8px;
-            margin-top: 6px;
+            border-radius: 10px;
+            padding: 6px;
+            margin-top: 4px;
         }
         .leaderboard h3 {
-            font-size: 12px;
+            font-size: 11px;
             text-align: center;
             color: var(--border-gold);
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             text-transform: uppercase;
-            letter-spacing: 1px;
         }
         .top-list {
             display: flex;
             justify-content: space-around;
-            font-size: 11px;
+            font-size: 10px;
         }
         .top-item {
             text-align: center;
             background: rgba(255,255,255,0.08);
-            padding: 4px 6px;
-            border-radius: 8px;
+            padding: 3px 4px;
+            border-radius: 6px;
             width: 31%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .top-item span { display: block; font-weight: bold; color: #ffd54f; font-size: 13px; }
+        .top-item span { display: block; font-weight: bold; color: #ffd54f; font-size: 12px; }
 
         .timer-section {
             text-align: center;
-            margin: 6px 0;
+            margin: 4px 0;
         }
         .question-badge {
             background: var(--border-gold);
             color: #000;
-            padding: 2px 12px;
-            border-radius: 15px;
+            padding: 2px 10px;
+            border-radius: 12px;
             font-weight: 800;
-            font-size: 12px;
+            font-size: 11px;
             display: inline-block;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
         .timer-circle {
-            width: 46px; height: 46px;
+            width: 38px; height: 38px;
             border-radius: 50%;
-            border: 3px solid var(--border-gold);
+            border: 2px solid var(--border-gold);
             display: flex;
             justify-content: center;
             align-items: center;
             margin: 0 auto;
-            font-size: 18px;
+            font-size: 15px;
             font-weight: bold;
             background: var(--bg-card);
-            box-shadow: 0 0 12px rgba(245, 185, 66, 0.3);
         }
 
         .question-box {
             background: linear-gradient(180deg, #1a2766 0%, #0e153d 100%);
             border: 2px solid var(--border-gold);
-            border-radius: 14px;
-            padding: 14px 12px;
+            border-radius: 12px;
+            padding: 10px;
             text-align: center;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
-            line-height: 1.3;
-            min-height: 90px;
+            line-height: 1.25;
+            min-height: 70px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
         .options-grid {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin: 10px 0;
+            gap: 6px;
+            margin: 6px 0;
         }
 
         .option-btn {
             position: relative;
             background: var(--bg-card);
             border: 2px solid #3c54b8;
-            border-radius: 22px;
-            padding: 10px 14px;
+            border-radius: 18px;
+            padding: 8px 12px;
             color: #fff;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             text-align: left;
             overflow: hidden;
@@ -186,45 +224,45 @@
         }
 
         .option-content, .vote-percent { position: relative; z-index: 1; }
-        .vote-percent { font-size: 12px; color: #ffd54f; font-weight: bold; }
+        .vote-percent { font-size: 11px; color: #ffd54f; font-weight: bold; }
 
         .option-btn.correct { background: var(--correct) !important; border-color: #72ffab !important; }
         .option-btn.wrong { background: var(--wrong) !important; border-color: #ff8a8a !important; opacity: 0.7; }
 
         .ticker {
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
             color: #a5b4fc;
-            height: 18px;
+            height: 16px;
             overflow: hidden;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .sim-bar {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             background: rgba(255,255,255,0.1);
-            padding: 6px;
-            border-radius: 10px;
+            padding: 4px;
+            border-radius: 8px;
         }
         .sim-bar input {
             flex: 1;
             background: #090d24;
             border: 1px solid #3c54b8;
             color: #fff;
-            padding: 6px 10px;
+            padding: 4px 8px;
             border-radius: 6px;
-            font-size: 12px;
+            font-size: 11px;
         }
         .sim-bar button {
             background: var(--accent-blue);
             color: #fff;
             border: none;
-            padding: 6px 12px;
+            padding: 4px 10px;
             border-radius: 6px;
             font-weight: bold;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
         }
 
         .modal {
@@ -235,33 +273,42 @@
             z-index: 100;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 15px;
         }
         .modal-content {
             background: var(--bg-card);
             border: 2px solid var(--border-gold);
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 14px;
+            padding: 15px;
             width: 100%;
+            max-width: 400px;
         }
-        .modal-content h2 { font-size: 16px; color: var(--border-gold); margin-bottom: 10px; }
-        .modal-content label { display: block; font-size: 11px; margin-bottom: 4px; color: #ccc; }
+        .modal-content h2 { font-size: 15px; color: var(--border-gold); margin-bottom: 8px; }
+        .modal-content label { display: block; font-size: 10px; margin-bottom: 2px; color: #ccc; }
         .modal-content input {
-            width: 100%; padding: 8px; margin-bottom: 10px;
-            border-radius: 8px; border: 1px solid #3c54b8;
-            background: #090d24; color: #fff; font-size: 13px;
+            width: 100%; padding: 6px; margin-bottom: 8px;
+            border-radius: 6px; border: 1px solid #3c54b8;
+            background: #090d24; color: #fff; font-size: 12px;
         }
-        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .modal-actions { display: flex; gap: 6px; justify-content: flex-end; }
     </style>
 </head>
 <body>
 
-<div class="live-container">
+<div class="live-container" id="liveContainer">
+    <!-- Màn hình chào & Nút Bắt Đầu -->
+    <div class="start-screen" id="startScreen">
+        <h1>🌟 Ai Là Triệu Phú</h1>
+        <p>Phiên bản tương tác TikTok Live.<br>Hỗ trợ hiển thị hoàn hảo ở cả chế độ dọc và ngang!</p>
+        <button class="btn-start" onclick="startGame()">BẮT ĐẦU CHƠI</button>
+    </div>
+
+    <!-- Header -->
     <div>
         <div class="header">
             <div>
                 <span id="statusDot" class="status-dot"></span>
-                <span id="statusText" style="font-size: 11px; font-weight: bold;">Chế độ Chạy Thử</span>
+                <span id="statusText" style="font-size: 10px; font-weight: bold;">Chế độ Chạy Thử</span>
             </div>
             <button class="btn-config" onclick="openModal()">⚙️ Kết nối Live</button>
         </div>
@@ -276,6 +323,7 @@
         </div>
     </div>
 
+    <!-- Câu hỏi & Đáp án -->
     <div>
         <div class="timer-section">
             <div class="question-badge" id="qNumber">CÂU 1 / 10</div>
@@ -283,7 +331,7 @@
         </div>
 
         <div class="question-box" id="questionText">
-            Đang tải câu hỏi...
+            Nhấn "Bắt đầu chơi" để load câu hỏi...
         </div>
 
         <div class="options-grid">
@@ -310,14 +358,16 @@
         </div>
     </div>
 
+    <!-- Ticker & Test Chat -->
     <div>
-        <div class="ticker" id="ticker">👉 Gõ A, B, C hoặc D trên chat để trả lời!</div>
+        <div class="ticker" id="ticker">👉 Gõ A, B, C hoặc D ở ô dưới để test thử!</div>
         <div class="sim-bar" id="simBar">
-            <input type="text" id="simInput" placeholder="Test gõ A, B, C, D..." maxlength="10">
+            <input type="text" id="simInput" placeholder="Gõ A, B, C, D..." maxlength="10">
             <button onclick="simulateChat()">Gửi</button>
         </div>
     </div>
 
+    <!-- Modal Cấu hình -->
     <div class="modal" id="configModal">
         <div class="modal-content">
             <h2>Kết nối TikTok Live</h2>
@@ -355,6 +405,11 @@
     let scores = {};
     let ws = null;
 
+    function startGame() {
+        document.getElementById('startScreen').style.display = 'none';
+        loadQuestion();
+    }
+
     function loadQuestion() {
         if (currentIdx >= questions.length) {
             currentIdx = 0;
@@ -376,7 +431,7 @@
         isAcceptingAnswers = true;
         timeLeft = 20;
         document.getElementById('timer').innerText = timeLeft;
-        document.getElementById('ticker').innerText = "👉 Gõ A, B, C hoặc D trên chat để trả lời!";
+        document.getElementById('ticker').innerText = "👉 Gõ A, B, C hoặc D ở dưới để test thử!";
 
         clearInterval(timerInterval);
         timerInterval = setInterval(() => {
@@ -499,26 +554,4 @@
         ws.onopen = () => {
             document.getElementById('statusDot').classList.add('connected');
             document.getElementById('statusText').innerText = `Live: @${user}`;
-            document.getElementById('simBar').style.display = 'none';
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const payload = JSON.parse(event.data);
-                if (payload.messages) {
-                    payload.messages.forEach(msg => {
-                        if (msg.type === 'WebcastChatMessage' && msg.data) {
-                            const uid = msg.data.user?.uniqueId || 'unknown';
-                            const nick = msg.data.user?.nickname || uid;
-                            const comment = msg.data.comment || '';
-                            handleIncomingComment(uid, nick, comment);
-                        }
-                    });
-                }
-            } catch (e) { console.error(e); }
-        };
-
-        ws.onclose = () => {
-            document.getElementById('statusDot').classList.remove('connected');
-            document.getElementById('statusText').innerText = "Mất kết nối";
-            document.getElementById('simBar').
+            document.getElementById('simBar').style.display = 'non
