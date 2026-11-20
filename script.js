@@ -30,6 +30,94 @@ let pausedFrom = null;
 let currentVotes = Object.create(null);
 let participants = new Map();
 let ws = null;
+let voiceEnabled = true;
+let musicEnabled = false;
+let audioContext = null;
+let musicTimer = null;
+let musicNoteIndex = 0;
+
+// Tạo giai điệu quiz nhẹ bằng Web Audio; không dùng/tải nhạc game show có bản quyền.
+function ensureAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!audioContext) audioContext = new AudioContextClass();
+  if (audioContext.state === 'suspended') audioContext.resume();
+  return audioContext;
+}
+
+function playNote(frequency, duration = 0.32, volume = 0.035, wave = 'sine') {
+  const context = ensureAudioContext();
+  if (!context) return;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = wave;
+  oscillator.frequency.value = frequency;
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(volume, context.currentTime + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + duration + 0.03);
+}
+
+function startMusic() {
+  ensureAudioContext();
+  if (!audioContext) {
+    $('ticker').textContent = 'Trình duyệt này không hỗ trợ nhạc nền Web Audio.';
+    return;
+  }
+  if (musicTimer) return;
+  musicEnabled = true;
+  $('musicButton').textContent = '🎵 Nhạc nền: bật';
+  $('musicButton').setAttribute('aria-pressed', 'true');
+  const melody = [392, 523.25, 587.33, 659.25, 523.25, 440, 523.25, 659.25];
+  musicTimer = setInterval(() => {
+    if (!musicEnabled || gameState === 'paused') return;
+    const note = melody[musicNoteIndex % melody.length];
+    playNote(note, 0.28, 0.018, 'triangle');
+    if (musicNoteIndex % 4 === 0) playNote(note / 2, 0.5, 0.012, 'sine');
+    musicNoteIndex += 1;
+  }, 420);
+}
+
+function stopMusic() {
+  musicEnabled = false;
+  clearInterval(musicTimer);
+  musicTimer = null;
+  $('musicButton').textContent = '🔇 Nhạc nền: tắt';
+  $('musicButton').setAttribute('aria-pressed', 'false');
+}
+
+function toggleMusic() {
+  ensureAudioContext();
+  if (musicEnabled) stopMusic();
+  else startMusic();
+}
+
+function speak(text) {
+  if (!voiceEnabled || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'vi-VN';
+  utterance.rate = 0.92;
+  utterance.pitch = 1;
+  const vietnameseVoice = window.speechSynthesis.getVoices().find(voice => voice.lang.toLowerCase().startsWith('vi'));
+  if (vietnameseVoice) utterance.voice = vietnameseVoice;
+  window.speechSynthesis.speak(utterance);
+}
+
+function speakQuestion(item) {
+  speak(`Câu ${currentIdx + 1}. ${item.q} Đáp án A: ${item.A}. Đáp án B: ${item.B}. Đáp án C: ${item.C}. Đáp án D: ${item.D}.`);
+}
+
+function toggleVoice() {
+  voiceEnabled = !voiceEnabled;
+  $('voiceButton').textContent = voiceEnabled ? '🗣️ Giọng đọc: bật' : '🔇 Giọng đọc: tắt';
+  $('voiceButton').setAttribute('aria-pressed', String(voiceEnabled));
+  if (!voiceEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+  else if (gameState === 'running' && isAcceptingAnswers) speakQuestion(questions[currentIdx]);
+}
 
 function setGameState(state) {
   gameState = state;
@@ -40,22 +128,41 @@ function setGameState(state) {
   $('ticker').dataset.state = state;
 }
 
-function startGame() {
+function resetRound({ resetPlayers = false } = {}) {
   clearInterval(timerInterval);
   clearTimeout(nextQuestionTimeout);
+  timerInterval = null;
+  nextQuestionTimeout = null;
   currentIdx = 0;
   timeLeft = 20;
   currentVotes = Object.create(null);
-  participants = new Map();
   mockUserIndex = 0;
   pausedFrom = null;
+  isAcceptingAnswers = false;
+  if (resetPlayers) participants = new Map();
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   $('chatHistory').replaceChildren();
+  const empty = document.createElement('li');
+  empty.className = 'empty-state';
+  empty.textContent = 'Tin nhắn sẽ hiển thị ở đây';
+  $('chatHistory').append(empty);
+  $('roundEndScreen').style.display = 'none';
   $('startScreen').style.display = 'none';
-  $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở ô dưới để test thử!';
   renderParticipants();
   renderLeaderboard();
   setGameState('running');
   loadQuestion();
+}
+
+function startGame() {
+  ensureAudioContext();
+  resetRound({ resetPlayers: true });
+  $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở ô dưới để test thử!';
+}
+
+function startNewRound() {
+  resetRound();
+  $('ticker').textContent = '🔄 Vòng mới bắt đầu! Gõ A, B, C hoặc D để trả lời.';
 }
 
 function loadQuestion() {
@@ -68,7 +175,6 @@ function loadQuestion() {
   $('questionText').textContent = item.q;
   const grid = $('optionsGrid');
   grid.replaceChildren();
-
   answerOptions.forEach(option => {
     const row = document.createElement('div');
     row.className = 'option-btn';
@@ -91,7 +197,6 @@ function loadQuestion() {
     row.append(bar, content, percent);
     grid.append(row);
   });
-
   currentVotes = Object.create(null);
   isAcceptingAnswers = true;
   timeLeft = 20;
@@ -99,6 +204,7 @@ function loadQuestion() {
   $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở dưới để trả lời!';
   clearInterval(timerInterval);
   clearTimeout(nextQuestionTimeout);
+  speakQuestion(item);
   timerInterval = setInterval(() => {
     if (gameState !== 'running') return;
     timeLeft -= 1;
@@ -138,7 +244,6 @@ function handleIncomingComment(userId, nickname, text) {
   const choice = answerOptions.includes(clean) ? clean : (answerOptions.includes(clean[0]) ? clean[0] : null);
   appendChatMessage(name, text.trim(), choice);
   if (!choice || gameState !== 'running' || !isAcceptingAnswers) return;
-
   const id = String(userId || name);
   if (!participants.has(id)) participants.set(id, { name, score: 0 });
   else participants.get(id).name = name;
@@ -162,7 +267,8 @@ function updateVoteBars() {
 function revealAnswer() {
   if (gameState !== 'running') return;
   isAcceptingAnswers = false;
-  const correct = questions[currentIdx].ans;
+  const item = questions[currentIdx];
+  const correct = item.ans;
   answerOptions.forEach(option => $(`opt-${option}`).classList.add(option === correct ? 'correct' : 'wrong'));
   let winners = 0;
   Object.entries(currentVotes).forEach(([id, vote]) => {
@@ -172,6 +278,9 @@ function revealAnswer() {
     if (participant) participant.score += 10;
   });
   $('ticker').textContent = `🎉 Đáp án đúng: ${correct} (${winners} bạn đúng +10đ)`;
+  speak(`Hết giờ. Đáp án đúng là ${correct}: ${item[correct]}. Có ${winners} người trả lời đúng.`);
+  playNote(659.25, 0.5, 0.045, 'triangle');
+  setTimeout(() => playNote(783.99, 0.6, 0.035, 'triangle'), 180);
   renderLeaderboard();
   renderParticipants();
   nextQuestionAt = Date.now() + 4000;
@@ -199,34 +308,25 @@ function nextQuestionNow() {
 function togglePause() {
   if (gameState === 'running') {
     pausedFrom = isAcceptingAnswers ? 'question' : 'reveal';
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-    if (nextQuestionTimeout) {
-      clearTimeout(nextQuestionTimeout);
-      nextQuestionTimeout = null;
-    }
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (nextQuestionTimeout) { clearTimeout(nextQuestionTimeout); nextQuestionTimeout = null; }
     isAcceptingAnswers = false;
+    if ('speechSynthesis' in window) window.speechSynthesis.pause();
     setGameState('paused');
     $('ticker').textContent = '⏸️ Trò chơi đang tạm dừng';
     return;
   }
   if (gameState !== 'paused') return;
   setGameState('running');
+  if ('speechSynthesis' in window) window.speechSynthesis.resume();
   if (pausedFrom === 'question') {
     isAcceptingAnswers = true;
     timerInterval = setInterval(() => {
       if (gameState !== 'running') return;
       timeLeft -= 1;
       $('timer').textContent = timeLeft;
-      if (timeLeft <= 0) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-        revealAnswer();
-      }
+      if (timeLeft <= 0) { clearInterval(timerInterval); timerInterval = null; revealAnswer(); }
     }, 1000);
-    $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở dưới để trả lời!';
   } else {
     const remaining = Math.max(0, nextQuestionAt - Date.now());
     nextQuestionTimeout = setTimeout(advanceQuestion, remaining);
@@ -241,9 +341,12 @@ function finishGame(message = '⏹️ Trò chơi đã kết thúc') {
   nextQuestionTimeout = null;
   isAcceptingAnswers = false;
   pausedFrom = null;
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   setGameState('ended');
   $('ticker').textContent = message;
   $('timer').textContent = '—';
+  $('roundEndMessage').textContent = message;
+  $('roundEndScreen').style.display = 'flex';
   renderLeaderboard();
   renderParticipants();
 }
@@ -290,7 +393,6 @@ function simulateChat() {
   const input = $('simInput');
   const text = input.value.trim();
   if (!text) return;
-
   const name = mockUsers[mockUserIndex % mockUsers.length];
   mockUserIndex += 1;
   handleIncomingComment(`mock-${name}-${mockUserIndex}`, name, text);
@@ -304,20 +406,14 @@ function closeModal() { $('configModal').style.display = 'none'; }
 function connectTikTok() {
   const user = $('ttUser').value.trim();
   const apiKey = $('ttApiKey').value.trim();
-  if (!user || !apiKey) {
-    alert('Vui lòng nhập đầy đủ Username và API Key!');
-    return;
-  }
+  if (!user || !apiKey) { alert('Vui lòng nhập đầy đủ Username và API Key!'); return; }
   if (ws) ws.close();
   closeModal();
   $('statusText').textContent = 'Đang kết nối...';
   try {
     const url = `wss://ws.eulerstream.com?uniqueId=${encodeURIComponent(user)}&apiKey=${encodeURIComponent(apiKey)}`;
     ws = new WebSocket(url);
-  } catch (error) {
-    $('statusText').textContent = 'Không thể kết nối';
-    return;
-  }
+  } catch (error) { $('statusText').textContent = 'Không thể kết nối'; return; }
   ws.onopen = () => {
     $('statusDot').classList.add('connected');
     $('statusText').textContent = `Live: @${user}`;
@@ -333,9 +429,7 @@ function connectTikTok() {
         const name = viewer.nickname || viewer.uniqueId || data.nickname || 'Viewer';
         handleIncomingComment(id, name, text);
       }
-    } catch (error) {
-      console.warn('Không đọc được tin nhắn TikTok Live:', error);
-    }
+    } catch (error) { console.warn('Không đọc được tin nhắn TikTok Live:', error); }
   };
   ws.onerror = () => { $('statusText').textContent = 'Lỗi kết nối Live'; };
   ws.onclose = () => {
@@ -346,9 +440,12 @@ function connectTikTok() {
 }
 
 $('startButton').addEventListener('click', startGame);
+$('newRoundButton').addEventListener('click', startNewRound);
 $('pauseButton').addEventListener('click', togglePause);
 $('nextButton').addEventListener('click', nextQuestionNow);
 $('endButton').addEventListener('click', () => finishGame());
+$('musicButton').addEventListener('click', toggleMusic);
+$('voiceButton').addEventListener('click', toggleVoice);
 $('configButton').addEventListener('click', openModal);
 $('closeModalButton').addEventListener('click', closeModal);
 $('connectButton').addEventListener('click', connectTikTok);
