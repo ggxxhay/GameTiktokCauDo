@@ -148,8 +148,10 @@ function toggleVoice() {
   $('voiceButton').setAttribute('aria-pressed', String(voiceEnabled));
   if (!voiceEnabled) {
     cancelSpeech();
+    if (gameState === 'running' && questionPhase === 'reading') startAnswerTimer();
+    else if (gameState === 'running' && questionPhase === 'results') scheduleAdvance(0);
   } else if (gameState === 'running' && questionPhase === 'reading') {
-    speakQuestion(questions[currentIdx], () => {});
+    speakQuestion(questions[currentIdx], startAnswerTimer);
   }
 }
 
@@ -213,11 +215,13 @@ function startNewRound() {
 }
 
 function startAnswerTimer() {
-  if (gameState !== 'running' || questionPhase !== 'answering') return;
+  if (gameState !== 'running' || questionPhase !== 'reading') return;
   if (timerInterval) return;
+  questionPhase = 'answering';
+  isAcceptingAnswers = true;
   timeLeft = questionDuration;
   $('timer').textContent = timeLeft;
-  clearInterval(timerInterval);
+  $('ticker').textContent = `🔊 Đã đọc xong — còn ${questionDuration} giây để bình luận A, B, C hoặc D!`;
   timerInterval = setInterval(() => {
     if (gameState !== 'running' || questionPhase !== 'answering') return;
     timeLeft -= 1;
@@ -263,14 +267,17 @@ function loadQuestion() {
     grid.append(row);
   });
   currentVotes = Object.create(null);
-  questionPhase = 'answering';
-  isAcceptingAnswers = true;
+  questionPhase = 'reading';
+  isAcceptingAnswers = true; // Cho phép bình luận ngay khi câu hỏi xuất hiện.
   timeLeft = questionDuration;
   $('timer').textContent = timeLeft;
-  $('ticker').textContent = '👉 Câu hỏi đã hiện — Gõ A, B, C hoặc D để trả lời!';
+  $('ticker').textContent = `🔊 Đang đọc câu hỏi; bình luận được nhận ngay, timer ${questionDuration} giây bắt đầu sau khi đọc xong.`;
   clearRoundTimers();
-  startAnswerTimer();
-  if (voiceEnabled) speakQuestion(item, () => {});
+  if (voiceEnabled && 'speechSynthesis' in window) {
+    speakQuestion(item, startAnswerTimer);
+  } else {
+    startAnswerTimer();
+  }
 }
 
 function appendChatMessage(nickname, text, choice = null) {
@@ -343,7 +350,7 @@ function scheduleAdvance(delay) {
 }
 
 function revealAnswer() {
-  if (gameState !== 'running' || questionPhase !== 'answering') return;
+  if (gameState !== 'running' || !['reading', 'answering'].includes(questionPhase)) return;
   clearInterval(timerInterval);
   timerInterval = null;
   isAcceptingAnswers = false;
@@ -380,7 +387,7 @@ function nextQuestionNow() {
   if (gameState !== 'running') return;
   clearRoundTimers();
   cancelSpeech();
-  if (questionPhase === 'answering') revealAnswer();
+  if (['reading', 'answering'].includes(questionPhase)) revealAnswer();
   clearTimeout(nextQuestionTimeout);
   nextQuestionTimeout = null;
   currentIdx += 1;
@@ -404,7 +411,6 @@ function togglePause() {
   }
   if (gameState !== 'paused') return;
   setGameState('running');
-  if ('speechSynthesis' in window) window.speechSynthesis.resume();
   if (pausedFrom === 'answering') {
     isAcceptingAnswers = true;
     timerInterval = setInterval(() => {
@@ -417,6 +423,13 @@ function togglePause() {
         revealAnswer();
       }
     }, 1000);
+  } else if (pausedFrom === 'reading') {
+    isAcceptingAnswers = true;
+    if (!voiceEnabled || !('speechSynthesis' in window)) startAnswerTimer();
+    else {
+      window.speechSynthesis.resume();
+      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) startAnswerTimer();
+    }
   } else if (pausedFrom === 'results') {
     const remaining = Math.max(0, nextQuestionAt - Date.now());
     nextQuestionTimeout = setTimeout(advanceQuestion, remaining);
@@ -445,6 +458,13 @@ function finishGame(message = '⏹️ Trò chơi đã kết thúc') {
     $('roundEndMessage').textContent = `Vòng mới sẽ tự bắt đầu sau ${remaining} giây.`;
   }, 250);
   autoRestartTimeout = setTimeout(startNewRound, roundRestartDelay * 1000);
+}
+
+function clearRestartTimers() {
+  clearInterval(autoRestartInterval);
+  clearTimeout(autoRestartTimeout);
+  autoRestartInterval = null;
+  autoRestartTimeout = null;
 }
 
 function renderLeaderboard() {
@@ -603,7 +623,8 @@ $('endButton').addEventListener('click', () => finishGame());
 $('musicButton').addEventListener('click', toggleMusic);
 $('voiceButton').addEventListener('click', toggleVoice);
 $('configButton').addEventListener('click', openModal);
-$('closeModalButton').addEventListener('click', connectTikTok);
+$('closeModalButton').addEventListener('click', closeModal);
+$('connectButton').addEventListener('click', connectTikTok);
 $('sendButton').addEventListener('click', simulateChat);
 $('simInput').addEventListener('keydown', event => { if (event.key === 'Enter') simulateChat(); });
 $('configModal').addEventListener('click', event => { if (event.target === $('configModal')) closeModal(); });

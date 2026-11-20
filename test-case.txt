@@ -1,15 +1,19 @@
 GAME TIKTOK CAU DO - TEST CASES / KIỂM THỬ
 
-A. Nhận đáp án
-1. Khi câu xuất hiện, giai đoạn bình chọn mở ngay; A/B/C/D được nhận dù giọng đọc chưa đọc xong.
-2. Timer bắt đầu ngay cùng lúc câu xuất hiện; 10 giây không chờ giọng đọc kết thúc.
-3. Gửi nhiều bình luận `A` cho cùng hoặc khác người trong vòng câu: chỉ giữ lựa chọn cuối của mỗi người.
-4. Nội dung `A!`, `chọn A`, `đáp án B` được parse; tin không phải lựa chọn không tính vote.
+A. Nhận bình luận và timer
+1. Khi câu xuất hiện, bình luận A/B/C/D được nhận ngay trong lúc giọng đọc đang phát.
+2. Timer giữ nguyên thời lượng cấu hình trong khi đọc; chỉ bắt đầu đếm sau khi đọc xong câu hỏi và đáp án.
+3. Nếu tắt giọng đọc hoặc trình duyệt không hỗ trợ SpeechSynthesis, timer bắt đầu ngay.
+4. Gửi nhiều bình luận cùng người trong một câu: lựa chọn cuối cùng được dùng; kết quả không bị cộng lặp.
+5. Khi tạm dừng lúc đang đọc, bình luận tạm khóa; tiếp tục thì phần đọc tiếp tục và timer chỉ bắt đầu sau khi đọc xong.
 
 B. Live
-5. Bật debugLiveMessages trong config.js để kiểm tra payload WebSocket nếu Live chưa nhận comment.
-6. Comment payload phẳng hoặc lồng data/payload/event/message đều được thử nhận diện.
+6. Bật debugLiveMessages trong config.js để xem payload thô từ WebSocket nếu bình luận Live chưa hiện trong chat.
+7. Kiểm tra trạng thái kết nối, nhận comment, nickname và user ID với payload thực tế của tài khoản/endpoint.
 
 C. Kết quả
-7. Hết 10 giây, chốt đáp án; cộng 10 điểm một lần cho người chọn đúng.
-8. Câu kế tiếp không hiện trước khi phần tổng kết speech kết thúc.
+8. Timer hết thì khóa vote, chốt đáp án và cộng điểm một lần.
+9. Phần tổng kết được đọc xong mới tự chuyển câu.
+10. Nút Đóng modal chỉ đóng modal; nút Kết nối ngay mới gọi WebSocket.
+
+Checklist chưa được chạy trên trình duyệt hoặc tài khoản Live thật.
