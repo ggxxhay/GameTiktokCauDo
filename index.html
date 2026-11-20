@@ -16,6 +16,12 @@
       <button class="btn-start" id="startButton" type="button">BẮT ĐẦU CHƠI</button>
     </section>
 
+    <section class="start-screen" id="roundEndScreen" aria-labelledby="roundEndTitle" style="display:none">
+      <h2 id="roundEndTitle" style="color:var(--gold);margin-bottom:10px">🎉 Vòng chơi đã kết thúc</h2>
+      <p id="roundEndMessage" style="color:#a5b4fc;margin-bottom:20px">Sẵn sàng cho vòng tiếp theo?</p>
+      <button class="btn-start" id="newRoundButton" type="button">BẮT ĐẦU VÒNG MỚI</button>
+    </section>
+
     <header class="game-header">
       <div class="header-row">
         <div class="connection-status"><span id="statusDot" class="status-dot"></span><span id="statusText">Chế độ Chạy Thử</span></div>
@@ -26,7 +32,10 @@
         <button class="control-button next-button" id="nextButton" type="button" disabled>Câu tiếp</button>
         <button class="control-button end-button" id="endButton" type="button" disabled>Kết thúc</button>
       </div>
-
+      <div class="game-controls audio-controls" aria-label="Điều khiển âm thanh">
+        <button class="control-button" id="musicButton" type="button" aria-pressed="false">🔇 Nhạc nền: tắt</button>
+        <button class="control-button" id="voiceButton" type="button" aria-pressed="true">🗣️ Giọng đọc: bật</button>
+      </div>
       <section class="leaderboard" aria-labelledby="leaderboardTitle">
         <h2 id="leaderboardTitle">🏆 Top Thông Thái</h2>
         <div class="top-list" id="topList" aria-live="polite"></div>
