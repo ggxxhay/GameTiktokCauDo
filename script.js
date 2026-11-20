@@ -18,8 +18,17 @@ const answerOptions = ['A', 'B', 'C', 'D'];
 const medals = ['🥇', '🥈', '🥉'];
 const mockUsers = ['Minh Anh', 'Tuấn Kiệt', 'Hoàng Nam', 'Bảo Ngọc', 'Bạn (Test)'];
 const maxChatMessages = 100;
-const questionDuration = 20;
-const roundRestartDelay = 15;
+const config = Object.assign({
+  answerDurationSeconds: 10,
+  roundRestartSeconds: 15,
+  speechLanguage: 'vi-VN',
+  speechRate: 0.92,
+  speechPitch: 1,
+  liveWebSocketUrl: 'wss://ws.eulerstream.com?uniqueId={username}&apiKey={apiKey}',
+  debugLiveMessages: false
+}, window.GAME_CONFIG || {});
+const questionDuration = Math.max(1, Number(config.answerDurationSeconds) || 10);
+const roundRestartDelay = Math.max(1, Number(config.roundRestartSeconds) || 15);
 let mockUserIndex = 0;
 let currentIdx = 0;
 let timeLeft = questionDuration;
@@ -29,11 +38,10 @@ let nextQuestionAt = 0;
 let autoRestartInterval = null;
 let autoRestartTimeout = null;
 let autoRestartAt = 0;
-let restartSecondsLeft = roundRestartDelay;
 let isAcceptingAnswers = false;
 let gameState = 'idle';
 let pausedFrom = null;
-let questionPhase = 'idle'; // idle, reading, answering, results, ended
+let questionPhase = 'idle';
 let currentVotes = Object.create(null);
 let participants = new Map();
 let ws = null;
@@ -115,13 +123,18 @@ function speak(text, onEnd = () => {}) {
     return;
   }
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'vi-VN';
-  utterance.rate = 0.92;
-  utterance.pitch = 1;
-  const vietnameseVoice = window.speechSynthesis.getVoices().find(voice => voice.lang.toLowerCase().startsWith('vi'));
-  if (vietnameseVoice) utterance.voice = vietnameseVoice;
+  utterance.lang = config.speechLanguage;
+  utterance.rate = Number(config.speechRate) || 0.92;
+  utterance.pitch = Number(config.speechPitch) || 1;
+  const languagePrefix = String(config.speechLanguage || 'vi').toLowerCase().split('-')[0];
+  const voice = window.speechSynthesis.getVoices().find(item => item.lang.toLowerCase().startsWith(languagePrefix));
+  if (voice) utterance.voice = voice;
   utterance.onend = () => { if (token === speechToken) onEnd(); };
-  utterance.onerror = () => { if (token === speechToken) onEnd(); };
+  utterance.onerror = event => {
+    if (token !== speechToken) return;
+    console.warn('Lỗi đọc giọng nói:', event.error);
+    onEnd();
+  };
   window.speechSynthesis.speak(utterance);
 }
 
@@ -193,7 +206,7 @@ function resetRound({ resetPlayers = false } = {}) {
 function startGame() {
   ensureAudioContext();
   resetRound({ resetPlayers: true });
-  $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở ô dưới để test thử!';
+  $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở dưới để test thử!';
 }
 
 function startNewRound() {
@@ -207,7 +220,7 @@ function startAnswerTimer() {
   isAcceptingAnswers = true;
   timeLeft = questionDuration;
   $('timer').textContent = timeLeft;
-  $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở dưới để trả lời!';
+  $('ticker').textContent = `👉 Đã đọc xong — còn ${questionDuration} giây để bình luận A, B, C hoặc D!`;
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     if (gameState !== 'running' || questionPhase !== 'answering') return;
@@ -259,8 +272,8 @@ function loadQuestion() {
   timeLeft = questionDuration;
   $('timer').textContent = timeLeft;
   $('ticker').textContent = voiceEnabled && 'speechSynthesis' in window
-    ? '🔊 Đang đọc câu hỏi và đáp án...'
-    : '👉 Gõ A, B, C hoặc D ở dưới để trả lời!';
+    ? '🔊 Đang đọc câu hỏi và đáp án; bình luận sẽ được tính sau khi đọc xong...'
+    : `👉 Gõ A, B, C hoặc D; có ${questionDuration} giây để trả lời!`;
   clearRoundTimers();
   speakQuestion(item, startAnswerTimer);
 }
@@ -294,20 +307,33 @@ function getParticipantKey(userId, name) {
   return normalizedName ? `name:${normalizedName}` : `id:${String(userId || 'viewer')}`;
 }
 
+function extractChoice(text) {
+  const normalized = String(text).trim().toLocaleUpperCase('vi');
+  const match = normalized.match(/^(?:ĐÁP ÁN|CHỌN|TÔI CHỌN|ANSWER)?\s*([ABCD])(?:\s|[.!,:;]|$)/u)
+    || normalized.match(/\b([ABCD])\s*$/u);
+  return match ? match[1] : null;
+}
+
 function handleIncomingComment(userId, nickname, text) {
-  if (typeof text !== 'string' || !text.trim()) return;
+  if (typeof text !== 'string' || !text.trim()) return false;
   const name = String(nickname || 'Viewer').trim() || 'Viewer';
-  const clean = text.trim().toUpperCase();
-  const choice = answerOptions.includes(clean) ? clean : (answerOptions.includes(clean[0]) ? clean[0] : null);
+  const choice = extractChoice(text);
   appendChatMessage(name, text.trim(), choice);
-  if (!choice || gameState !== 'running' || !isAcceptingAnswers) return;
+  if (!choice) return false;
+  if (gameState !== 'running' || !isAcceptingAnswers) {
+    if (gameState === 'running' && questionPhase === 'reading') {
+      $('ticker').textContent = `💬 Đã nhận bình luận của ${name}; bình chọn mở sau khi đọc câu hỏi xong.`;
+    }
+    return false;
+  }
   const id = getParticipantKey(userId, name);
   if (!participants.has(id)) participants.set(id, { name, score: 0 });
   else participants.get(id).name = name;
   currentVotes[id] = { name, choice };
-  $('ticker').textContent = `💬 ${name} chọn: ${choice}`;
+  $('ticker').textContent = `💬 Đã nhận ${choice} từ ${name}`;
   updateVoteBars();
   renderParticipants();
+  return true;
 }
 
 function updateVoteBars() {
@@ -411,7 +437,6 @@ function togglePause() {
     const remaining = Math.max(0, nextQuestionAt - Date.now());
     nextQuestionTimeout = setTimeout(advanceQuestion, remaining);
   } else if (pausedFrom === 'reading') {
-    // SpeechSynthesis.resume() continues the paused utterance; if unavailable, begin answer time.
     if (!('speechSynthesis' in window) || !voiceEnabled) startAnswerTimer();
   }
   pausedFrom = null;
@@ -432,11 +457,10 @@ function finishGame(message = '⏹️ Trò chơi đã kết thúc') {
   $('roundEndPanel').hidden = false;
   renderLeaderboard();
   renderParticipants();
-  restartSecondsLeft = roundRestartDelay;
   autoRestartAt = Date.now() + roundRestartDelay * 1000;
   autoRestartInterval = setInterval(() => {
-    restartSecondsLeft = Math.max(0, Math.ceil((autoRestartAt - Date.now()) / 1000));
-    $('roundEndMessage').textContent = `Vòng mới sẽ tự bắt đầu sau ${restartSecondsLeft} giây.`;
+    const remaining = Math.max(0, Math.ceil((autoRestartAt - Date.now()) / 1000));
+    $('roundEndMessage').textContent = `Vòng mới sẽ tự bắt đầu sau ${remaining} giây.`;
   }, 250);
   autoRestartTimeout = setTimeout(startNewRound, roundRestartDelay * 1000);
 }
@@ -485,9 +509,7 @@ function simulateChat() {
   if (!text) return;
   const name = mockUsers[mockUserIndex % mockUsers.length];
   mockUserIndex += 1;
-  // Deterministic identity: each mock name maps to one participant across all rounds/messages.
-  const mockId = `mock:${normalizeName(name)}`;
-  handleIncomingComment(mockId, name, text);
+  handleIncomingComment(`mock:${normalizeName(name)}`, name, text);
   input.value = '';
   input.focus();
 }
@@ -495,38 +517,102 @@ function simulateChat() {
 function openModal() { $('configModal').style.display = 'flex'; $('ttUser').focus(); }
 function closeModal() { $('configModal').style.display = 'none'; }
 
+function firstNonEmptyString(...values) {
+  return values.find(value => typeof value === 'string' && value.trim())?.trim() || null;
+}
+
+function findLiveComment(payload) {
+  const queue = [payload];
+  const seen = new Set();
+  while (queue.length) {
+    const node = queue.shift();
+    if (!node || typeof node !== 'object' || seen.has(node)) continue;
+    seen.add(node);
+    const user = node.userDetails || node.userInfo || node.user || node.author || node.viewer || {};
+    const text = firstNonEmptyString(
+      node.comment, node.text, node.content, node.commentText, node.messageText,
+      typeof node.message === 'string' ? node.message : null,
+      node.comment && node.comment.text,
+      node.message && node.message.comment,
+      node.data && node.data.comment
+    );
+    if (text) {
+      const nickname = firstNonEmptyString(
+        user.nickname, user.nickName, user.displayName, user.uniqueId, user.username,
+        node.nickname, node.nickName, node.uniqueId, node.username, node.displayName
+      ) || 'Viewer';
+      const userId = firstNonEmptyString(
+        user.userId, user.id, user.uniqueId, user.secUid,
+        node.userId, node.uid, node.id, node.secUid
+      ) || nickname;
+      return { userId, nickname, text };
+    }
+    for (const key of ['data', 'payload', 'event', 'message', 'result', 'body', 'webcastMessage']) {
+      const child = node[key];
+      if (child && typeof child === 'object') queue.push(child);
+    }
+    if (Array.isArray(node)) queue.push(...node);
+  }
+  return null;
+}
+
+function handleLiveFrame(raw) {
+  let payload;
+  try {
+    payload = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch (error) {
+    console.warn('Không parse được frame TikTok Live:', error);
+    return;
+  }
+  if (config.debugLiveMessages) console.debug('TikTok Live frame:', payload);
+  const events = Array.isArray(payload) ? payload : [payload];
+  let found = false;
+  events.forEach(event => {
+    const comment = findLiveComment(event);
+    if (!comment) return;
+    found = true;
+    handleIncomingComment(comment.userId, comment.nickname, comment.text);
+  });
+  if (!found && config.debugLiveMessages) console.debug('Frame chưa nhận diện là comment; kiểm tra cấu trúc payload trong Console.');
+}
+
 function connectTikTok() {
-  const user = $('ttUser').value.trim();
+  const user = $('ttUser').value.trim().replace(/^@/, '');
   const apiKey = $('ttApiKey').value.trim();
   if (!user || !apiKey) { alert('Vui lòng nhập đầy đủ Username và API Key!'); return; }
-  if (ws) ws.close();
+  if (ws) {
+    ws.onclose = null;
+    ws.close();
+  }
   closeModal();
   $('statusText').textContent = 'Đang kết nối...';
+  $('ticker').textContent = '🔌 Đang kết nối TikTok Live...';
+  $('statusDot').classList.remove('connected');
   try {
-    const url = `wss://ws.eulerstream.com?uniqueId=${encodeURIComponent(user)}&apiKey=${encodeURIComponent(apiKey)}`;
+    const url = String(config.liveWebSocketUrl)
+      .replace('{username}', encodeURIComponent(user))
+      .replace('{apiKey}', encodeURIComponent(apiKey));
     ws = new WebSocket(url);
-  } catch (error) { $('statusText').textContent = 'Không thể kết nối'; return; }
+  } catch (error) {
+    $('statusText').textContent = 'Không thể kết nối';
+    $('ticker').textContent = `❌ Không thể tạo kết nối: ${error.message}`;
+    return;
+  }
   ws.onopen = () => {
     $('statusDot').classList.add('connected');
     $('statusText').textContent = `Live: @${user}`;
+    $('ticker').textContent = '✅ Đã kết nối Live; đang chờ bình luận.';
     $('simBar').hidden = true;
   };
-  ws.onmessage = event => {
-    try {
-      const data = JSON.parse(event.data);
-      const text = data.comment || data.text || data.message;
-      const viewer = data.user || {};
-      if (typeof text === 'string') {
-        const id = viewer.id || data.userId || viewer.uniqueId || 'viewer';
-        const name = viewer.nickname || viewer.uniqueId || data.nickname || 'Viewer';
-        handleIncomingComment(id, name, text);
-      }
-    } catch (error) { console.warn('Không đọc được tin nhắn TikTok Live:', error); }
+  ws.onmessage = event => handleLiveFrame(event.data);
+  ws.onerror = () => {
+    $('statusText').textContent = 'Lỗi kết nối Live';
+    $('ticker').textContent = '❌ Lỗi WebSocket Live; kiểm tra endpoint/API key và Console.';
   };
-  ws.onerror = () => { $('statusText').textContent = 'Lỗi kết nối Live'; };
-  ws.onclose = () => {
+  ws.onclose = event => {
     $('statusDot').classList.remove('connected');
-    $('statusText').textContent = 'Đã ngắt kết nối';
+    $('statusText').textContent = `Đã ngắt kết nối${event.code ? ` (${event.code})` : ''}`;
+    $('ticker').textContent = event.reason || 'Kết nối Live đã đóng.';
     $('simBar').hidden = false;
   };
 }

@@ -1,57 +1,21 @@
 GAME TIKTOK CAU DO - TEST CASES / KIỂM THỬ
 
-Mục tiêu
-- Kiểm tra khởi chạy, đọc câu hỏi, timer, vote, chấm điểm, điều khiển vòng, âm thanh và giao diện.
-- Checklist này chưa được tự chạy trên trình duyệt; cần đánh dấu pass/fail khi bạn chạy thực tế.
+A. Cấu hình và nạp trang
+1. Kiểm tra config.js được tải trước script.js, CSS và JS không báo lỗi.
+2. Sửa answerDurationSeconds trong config.js: timer dùng đúng giá trị mới.
+3. Với cấu hình mặc định, timer chỉ bắt đầu sau khi đọc xong câu hỏi và các đáp án, sau đó đếm 10 giây.
+4. Tắt voice hoặc không có SpeechSynthesis: timer bắt đầu ngay theo fallback.
 
-Thiết lập
-- Chạy server tĩnh tại repo (python3 -m http.server 8000), mở http://localhost:8000 và DevTools Console.
-- Không cần API key cho các case mock. Kiểm tra trình duyệt có Web Speech API; nếu không có thì dùng voice toggle để kiểm tra fallback.
+B. Bình luận / nhận vote
+5. Trong lúc câu hỏi đang được đọc: bình luận hiện ở chat nhưng chưa tính vote.
+6. Sau khi đọc xong: bình luận A, B, C, D ở TikTok Live được hiện trong chat, cập nhật vote bar và participants.
+7. Thử nội dung `A`, `A!`, `chọn A`, `đáp án B`; lựa chọn được parse đúng. Nội dung không có lựa chọn không tính vote.
+8. Bật GAME_CONFIG.debugLiveMessages trong config.js; xem Console để kiểm tra payload raw từ phiên Live nếu bình luận vẫn chưa nhận diện.
+9. Kiểm tra comment payload phẳng và lồng trong data/payload/event/message; lỗi parse không làm ngắt trang.
+10. Cùng tên với userId khác nhau vẫn gộp thành một participant; lựa chọn cuối trong câu được dùng.
 
-A. Bootstrap
-1. Mở trang: start screen/nút BẮT ĐẦU hiện, các file CSS/JS tải, Console không có lỗi.
-2. Bấm bắt đầu: start screen đóng, câu 1 và 4 đáp án hiện; không còn lỗi null element.
-3. Bấm bắt đầu nhiều lần trong lúc chơi không tạo nhiều timer hay vòng song song.
+C. Kết quả / vòng mới
+11. Đáp án đúng cộng 10 điểm một lần; kết quả được đọc xong mới chuyển câu.
+12. Kết thúc vòng: leaderboard vẫn hiện; auto restart sau roundRestartSeconds; nút bắt đầu vòng mới hoạt động ngay.
 
-B. Đọc câu hỏi và timer
-4. Voice bật: khi câu hỏi/4 đáp án đang được đọc, timer đứng ở 20 và không nhận vote.
-5. Sau event speechSynthesis utterance end, timer bắt đầu đếm đủ 20 giây và mới nhận vote.
-6. Tắt voice khi đang đọc: speech dừng và timer bắt đầu ngay; bật voice lại trong giai đoạn đọc thì timer chờ đến khi đọc xong.
-7. Không hỗ trợ speechSynthesis hoặc voice tắt: timer/vote bắt đầu ngay, không treo ở trạng thái reading.
-8. Pause/resume trong lúc đọc: timer không chạy trước khi đọc kết thúc; sau resume đọc xong mới có 20 giây.
-9. Pause/resume lúc trả lời: giữ số giây còn lại; không mất vote đã nhận.
-
-C. Người chơi / định danh / vote
-10. Gửi A/B/C/D: chat có tin, vote bar cập nhật và mỗi người chơi chỉ có một dòng.
-11. Gửi nội dung khác A-D: chỉ thêm chat, không tính vote.
-12. Hai tin cùng tên nhưng khác userId (ví dụ id-1 và id-2, nickname "Minh Anh"): participant chỉ có một dòng “Minh Anh”; vote là lựa chọn mới nhất; điểm cộng dồn chung.
-13. Tên khác dấu/khoảng trắng thừa nhưng cùng tên chuẩn hóa (“Minh Ánh” không được coi cùng “Minh Anh”; “ Minh Anh ” và “minh anh” được gộp): danh sách không nhân đôi.
-14. Mock ID được tạo ổn định từ normalizeName(name), không tăng ID theo mỗi tin; gửi nhiều lần một tên mock vẫn giữ đúng người và lựa chọn cuối.
-15. Cùng người trả lời đúng ở nhiều câu: tổng điểm tăng 10 mỗi câu, leaderboard/participants/top 3 hiển thị một dòng với tổng điểm.
-16. Chat tự cuộn và giới hạn tối đa 100 tin.
-
-D. Chốt đáp án / chuyển câu
-17. Khi timer về 0: khóa vote, đánh dấu đúng/sai, cộng 10 cho từng tên có lựa chọn đúng; chỉ chấm một lần.
-18. Sau khi hiện kết quả, voice đọc đáp án đúng và số người đúng; câu kế tiếp chưa xuất hiện trong lúc đọc.
-19. Khi phần tổng kết speech kết thúc, mới tự chuyển đúng một câu; khi voice tắt/không khả dụng thì chuyển ngay theo fallback.
-20. Nút Câu tiếp trong lúc đọc câu hỏi hoặc đang trả lời: chốt câu không cộng lặp và chuyển câu theo yêu cầu nút.
-21. Qua câu 10: giữ kết quả và điểm, hiện thông báo kết thúc không che bảng điểm; đếm ngược 15 giây.
-
-E. Kết thúc / vòng mới
-22. Bấm Kết thúc giữa vòng: timer và speech dừng; điểm/leaderboard vẫn nhìn thấy; panel kết thúc nằm trong luồng game, không phủ toàn màn hình.
-23. Đếm ngược hiển thị giảm từ 15 giây; đủ 15 giây tự mở vòng mới ở câu 1.
-24. Bấm BẮT ĐẦU VÒNG MỚI trước hạn: hủy auto restart cũ và bắt đầu ngay; giữ điểm/người chơi, xóa chat vòng cũ.
-25. Kết thúc liên tục hoặc bấm nút mới nhiều lần không tạo nhiều countdown/timeout.
-
-F. Nhạc, live và responsive
-26. Nhạc bật/tắt sau thao tác người dùng, không lỗi nếu Web Audio không hỗ trợ.
-27. Mở/đóng modal, thiếu credentials báo lỗi; không đưa API key vào console.
-28. WebSocket open/message/error/close (chỉ với live và credential hợp lệ): trạng thái phù hợp, comment xử lý được; mock hiện lại khi ngắt.
-29. Kiểm tra viewport điện thoại dọc/ngang và chiều cao thấp: bảng điểm, câu hỏi, chat, input và panel kết thúc không chồng lấp; danh sách người chơi có thể cuộn.
-
-Kết quả chạy
-- Browser/OS:
-- Commit/URL:
-- Console errors:
-- Pass/fail theo số test:
-- Ghi chú/lỗi:
+Lưu ý: Checklist chưa được chạy trên tài khoản TikTok Live thật; cần kiểm tra payload thực tế của tài khoản/endpoint EulerStream.
