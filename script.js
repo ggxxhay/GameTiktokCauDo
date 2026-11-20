@@ -18,15 +18,22 @@ const answerOptions = ['A', 'B', 'C', 'D'];
 const medals = ['🥇', '🥈', '🥉'];
 const mockUsers = ['Minh Anh', 'Tuấn Kiệt', 'Hoàng Nam', 'Bảo Ngọc', 'Bạn (Test)'];
 const maxChatMessages = 100;
+const questionDuration = 20;
+const roundRestartDelay = 15;
 let mockUserIndex = 0;
 let currentIdx = 0;
-let timeLeft = 20;
+let timeLeft = questionDuration;
 let timerInterval = null;
 let nextQuestionTimeout = null;
 let nextQuestionAt = 0;
+let autoRestartInterval = null;
+let autoRestartTimeout = null;
+let autoRestartAt = 0;
+let restartSecondsLeft = roundRestartDelay;
 let isAcceptingAnswers = false;
 let gameState = 'idle';
 let pausedFrom = null;
+let questionPhase = 'idle'; // idle, reading, answering, results, ended
 let currentVotes = Object.create(null);
 let participants = new Map();
 let ws = null;
@@ -35,8 +42,8 @@ let musicEnabled = false;
 let audioContext = null;
 let musicTimer = null;
 let musicNoteIndex = 0;
+let speechToken = 0;
 
-// Tạo giai điệu quiz nhẹ bằng Web Audio; không dùng/tải nhạc game show có bản quyền.
 function ensureAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return null;
@@ -95,58 +102,87 @@ function toggleMusic() {
   else startMusic();
 }
 
-function speak(text) {
-  if (!voiceEnabled || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
+function cancelSpeech() {
+  speechToken += 1;
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+
+function speak(text, onEnd = () => {}) {
+  cancelSpeech();
+  const token = speechToken;
+  if (!voiceEnabled || !('speechSynthesis' in window)) {
+    window.setTimeout(() => { if (token === speechToken) onEnd(); }, 0);
+    return;
+  }
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'vi-VN';
   utterance.rate = 0.92;
   utterance.pitch = 1;
   const vietnameseVoice = window.speechSynthesis.getVoices().find(voice => voice.lang.toLowerCase().startsWith('vi'));
   if (vietnameseVoice) utterance.voice = vietnameseVoice;
+  utterance.onend = () => { if (token === speechToken) onEnd(); };
+  utterance.onerror = () => { if (token === speechToken) onEnd(); };
   window.speechSynthesis.speak(utterance);
 }
 
-function speakQuestion(item) {
-  speak(`Câu ${currentIdx + 1}. ${item.q} Đáp án A: ${item.A}. Đáp án B: ${item.B}. Đáp án C: ${item.C}. Đáp án D: ${item.D}.`);
+function speakQuestion(item, onEnd) {
+  speak(`Câu ${currentIdx + 1}. ${item.q} Đáp án A: ${item.A}. Đáp án B: ${item.B}. Đáp án C: ${item.C}. Đáp án D: ${item.D}.`, onEnd);
 }
 
 function toggleVoice() {
   voiceEnabled = !voiceEnabled;
   $('voiceButton').textContent = voiceEnabled ? '🗣️ Giọng đọc: bật' : '🔇 Giọng đọc: tắt';
   $('voiceButton').setAttribute('aria-pressed', String(voiceEnabled));
-  if (!voiceEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
-  else if (gameState === 'running' && isAcceptingAnswers) speakQuestion(questions[currentIdx]);
+  if (!voiceEnabled) {
+    cancelSpeech();
+    if (gameState === 'running' && questionPhase === 'reading') startAnswerTimer();
+    else if (gameState === 'running' && questionPhase === 'results') scheduleAdvance(0);
+  } else if (gameState === 'running' && questionPhase === 'reading') {
+    speakQuestion(questions[currentIdx], startAnswerTimer);
+  }
 }
 
 function setGameState(state) {
   gameState = state;
   $('pauseButton').disabled = !['running', 'paused'].includes(state);
-  $('nextButton').disabled = gameState !== 'running';
+  $('nextButton').disabled = state !== 'running';
   $('endButton').disabled = !['running', 'paused'].includes(state);
   $('pauseButton').textContent = state === 'paused' ? 'Tiếp tục' : 'Tạm dừng';
   $('ticker').dataset.state = state;
 }
 
-function resetRound({ resetPlayers = false } = {}) {
+function clearRoundTimers() {
   clearInterval(timerInterval);
   clearTimeout(nextQuestionTimeout);
   timerInterval = null;
   nextQuestionTimeout = null;
+}
+
+function clearRestartTimers() {
+  clearInterval(autoRestartInterval);
+  clearTimeout(autoRestartTimeout);
+  autoRestartInterval = null;
+  autoRestartTimeout = null;
+}
+
+function resetRound({ resetPlayers = false } = {}) {
+  clearRoundTimers();
+  clearRestartTimers();
+  cancelSpeech();
   currentIdx = 0;
-  timeLeft = 20;
+  timeLeft = questionDuration;
   currentVotes = Object.create(null);
   mockUserIndex = 0;
   pausedFrom = null;
+  questionPhase = 'idle';
   isAcceptingAnswers = false;
   if (resetPlayers) participants = new Map();
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   $('chatHistory').replaceChildren();
   const empty = document.createElement('li');
   empty.className = 'empty-state';
   empty.textContent = 'Tin nhắn sẽ hiển thị ở đây';
   $('chatHistory').append(empty);
-  $('roundEndScreen').style.display = 'none';
+  $('roundEndPanel').hidden = true;
   $('startScreen').style.display = 'none';
   renderParticipants();
   renderLeaderboard();
@@ -163,6 +199,26 @@ function startGame() {
 function startNewRound() {
   resetRound();
   $('ticker').textContent = '🔄 Vòng mới bắt đầu! Gõ A, B, C hoặc D để trả lời.';
+}
+
+function startAnswerTimer() {
+  if (gameState !== 'running' || questionPhase !== 'reading') return;
+  questionPhase = 'answering';
+  isAcceptingAnswers = true;
+  timeLeft = questionDuration;
+  $('timer').textContent = timeLeft;
+  $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở dưới để trả lời!';
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (gameState !== 'running' || questionPhase !== 'answering') return;
+    timeLeft -= 1;
+    $('timer').textContent = timeLeft;
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      revealAnswer();
+    }
+  }, 1000);
 }
 
 function loadQuestion() {
@@ -198,23 +254,15 @@ function loadQuestion() {
     grid.append(row);
   });
   currentVotes = Object.create(null);
-  isAcceptingAnswers = true;
-  timeLeft = 20;
+  isAcceptingAnswers = false;
+  questionPhase = 'reading';
+  timeLeft = questionDuration;
   $('timer').textContent = timeLeft;
-  $('ticker').textContent = '👉 Gõ A, B, C hoặc D ở dưới để trả lời!';
-  clearInterval(timerInterval);
-  clearTimeout(nextQuestionTimeout);
-  speakQuestion(item);
-  timerInterval = setInterval(() => {
-    if (gameState !== 'running') return;
-    timeLeft -= 1;
-    $('timer').textContent = timeLeft;
-    if (timeLeft <= 0) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-      revealAnswer();
-    }
-  }, 1000);
+  $('ticker').textContent = voiceEnabled && 'speechSynthesis' in window
+    ? '🔊 Đang đọc câu hỏi và đáp án...'
+    : '👉 Gõ A, B, C hoặc D ở dưới để trả lời!';
+  clearRoundTimers();
+  speakQuestion(item, startAnswerTimer);
 }
 
 function appendChatMessage(nickname, text, choice = null) {
@@ -237,14 +285,23 @@ function appendChatMessage(nickname, text, choice = null) {
   history.scrollTop = history.scrollHeight;
 }
 
+function normalizeName(name) {
+  return String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
+}
+
+function getParticipantKey(userId, name) {
+  const normalizedName = normalizeName(name);
+  return normalizedName ? `name:${normalizedName}` : `id:${String(userId || 'viewer')}`;
+}
+
 function handleIncomingComment(userId, nickname, text) {
   if (typeof text !== 'string' || !text.trim()) return;
-  const name = String(nickname || 'Viewer');
+  const name = String(nickname || 'Viewer').trim() || 'Viewer';
   const clean = text.trim().toUpperCase();
   const choice = answerOptions.includes(clean) ? clean : (answerOptions.includes(clean[0]) ? clean[0] : null);
   appendChatMessage(name, text.trim(), choice);
   if (!choice || gameState !== 'running' || !isAcceptingAnswers) return;
-  const id = String(userId || name);
+  const id = getParticipantKey(userId, name);
   if (!participants.has(id)) participants.set(id, { name, score: 0 });
   else participants.get(id).name = name;
   currentVotes[id] = { name, choice };
@@ -264,9 +321,18 @@ function updateVoteBars() {
   });
 }
 
+function scheduleAdvance(delay) {
+  clearTimeout(nextQuestionTimeout);
+  nextQuestionAt = Date.now() + delay;
+  nextQuestionTimeout = setTimeout(advanceQuestion, delay);
+}
+
 function revealAnswer() {
-  if (gameState !== 'running') return;
+  if (gameState !== 'running' || questionPhase !== 'answering') return;
+  clearInterval(timerInterval);
+  timerInterval = null;
   isAcceptingAnswers = false;
+  questionPhase = 'results';
   const item = questions[currentIdx];
   const correct = item.ans;
   answerOptions.forEach(option => $(`opt-${option}`).classList.add(option === correct ? 'correct' : 'wrong'));
@@ -277,39 +343,49 @@ function revealAnswer() {
     const participant = participants.get(id);
     if (participant) participant.score += 10;
   });
+  const result = `Hết giờ. Đáp án đúng là ${correct}: ${item[correct]}. Có ${winners} người trả lời đúng và được cộng 10 điểm.`;
   $('ticker').textContent = `🎉 Đáp án đúng: ${correct} (${winners} bạn đúng +10đ)`;
-  speak(`Hết giờ. Đáp án đúng là ${correct}: ${item[correct]}. Có ${winners} người trả lời đúng.`);
   playNote(659.25, 0.5, 0.045, 'triangle');
-  setTimeout(() => playNote(783.99, 0.6, 0.035, 'triangle'), 180);
+  window.setTimeout(() => playNote(783.99, 0.6, 0.035, 'triangle'), 180);
   renderLeaderboard();
   renderParticipants();
-  nextQuestionAt = Date.now() + 4000;
-  nextQuestionTimeout = setTimeout(advanceQuestion, 4000);
+  speak(result, () => {
+    if (gameState === 'running' && questionPhase === 'results') scheduleAdvance(0);
+  });
 }
 
 function advanceQuestion() {
   nextQuestionTimeout = null;
-  if (gameState !== 'running') return;
+  if (gameState !== 'running' || questionPhase !== 'results') return;
   currentIdx += 1;
   loadQuestion();
 }
 
 function nextQuestionNow() {
   if (gameState !== 'running') return;
-  if (isAcceptingAnswers) revealAnswer();
-  else {
-    clearTimeout(nextQuestionTimeout);
-    nextQuestionTimeout = null;
+  clearRoundTimers();
+  cancelSpeech();
+  if (questionPhase === 'reading') {
+    questionPhase = 'answering';
+    isAcceptingAnswers = true;
   }
+  if (questionPhase === 'answering') revealAnswer();
+  clearTimeout(nextQuestionTimeout);
+  nextQuestionTimeout = null;
   currentIdx += 1;
+  questionPhase = 'idle';
   loadQuestion();
 }
 
 function togglePause() {
   if (gameState === 'running') {
-    pausedFrom = isAcceptingAnswers ? 'question' : 'reveal';
-    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    if (nextQuestionTimeout) { clearTimeout(nextQuestionTimeout); nextQuestionTimeout = null; }
+    pausedFrom = questionPhase;
+    clearInterval(timerInterval);
+    timerInterval = null;
+    if (nextQuestionTimeout) {
+      clearTimeout(nextQuestionTimeout);
+      nextQuestionTimeout = null;
+    }
     isAcceptingAnswers = false;
     if ('speechSynthesis' in window) window.speechSynthesis.pause();
     setGameState('paused');
@@ -319,40 +395,54 @@ function togglePause() {
   if (gameState !== 'paused') return;
   setGameState('running');
   if ('speechSynthesis' in window) window.speechSynthesis.resume();
-  if (pausedFrom === 'question') {
+  if (pausedFrom === 'answering') {
     isAcceptingAnswers = true;
     timerInterval = setInterval(() => {
-      if (gameState !== 'running') return;
+      if (gameState !== 'running' || questionPhase !== 'answering') return;
       timeLeft -= 1;
       $('timer').textContent = timeLeft;
-      if (timeLeft <= 0) { clearInterval(timerInterval); timerInterval = null; revealAnswer(); }
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        revealAnswer();
+      }
     }, 1000);
-  } else {
+  } else if (pausedFrom === 'results') {
     const remaining = Math.max(0, nextQuestionAt - Date.now());
     nextQuestionTimeout = setTimeout(advanceQuestion, remaining);
+  } else if (pausedFrom === 'reading') {
+    // SpeechSynthesis.resume() continues the paused utterance; if unavailable, begin answer time.
+    if (!('speechSynthesis' in window) || !voiceEnabled) startAnswerTimer();
   }
   pausedFrom = null;
 }
 
 function finishGame(message = '⏹️ Trò chơi đã kết thúc') {
-  clearInterval(timerInterval);
-  clearTimeout(nextQuestionTimeout);
-  timerInterval = null;
-  nextQuestionTimeout = null;
+  if (gameState === 'ended') return;
+  clearRoundTimers();
+  clearRestartTimers();
+  cancelSpeech();
   isAcceptingAnswers = false;
   pausedFrom = null;
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  questionPhase = 'ended';
   setGameState('ended');
   $('ticker').textContent = message;
   $('timer').textContent = '—';
-  $('roundEndMessage').textContent = message;
-  $('roundEndScreen').style.display = 'flex';
+  $('roundEndMessage').textContent = `Vòng mới sẽ tự bắt đầu sau ${roundRestartDelay} giây.`;
+  $('roundEndPanel').hidden = false;
   renderLeaderboard();
   renderParticipants();
+  restartSecondsLeft = roundRestartDelay;
+  autoRestartAt = Date.now() + roundRestartDelay * 1000;
+  autoRestartInterval = setInterval(() => {
+    restartSecondsLeft = Math.max(0, Math.ceil((autoRestartAt - Date.now()) / 1000));
+    $('roundEndMessage').textContent = `Vòng mới sẽ tự bắt đầu sau ${restartSecondsLeft} giây.`;
+  }, 250);
+  autoRestartTimeout = setTimeout(startNewRound, roundRestartDelay * 1000);
 }
 
 function renderLeaderboard() {
-  const top = [...participants.values()].sort((a, b) => b.score - a.score).slice(0, 3);
+  const top = [...participants.values()].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 3);
   const list = $('topList');
   list.replaceChildren();
   for (let index = 0; index < 3; index += 1) {
@@ -395,7 +485,9 @@ function simulateChat() {
   if (!text) return;
   const name = mockUsers[mockUserIndex % mockUsers.length];
   mockUserIndex += 1;
-  handleIncomingComment(`mock-${name}-${mockUserIndex}`, name, text);
+  // Deterministic identity: each mock name maps to one participant across all rounds/messages.
+  const mockId = `mock:${normalizeName(name)}`;
+  handleIncomingComment(mockId, name, text);
   input.value = '';
   input.focus();
 }

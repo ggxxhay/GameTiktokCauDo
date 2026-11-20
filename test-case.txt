@@ -1,56 +1,57 @@
 GAME TIKTOK CAU DO - TEST CASES / KIỂM THỬ
 
 Mục tiêu
-- Kiểm tra các luồng bắt đầu, chơi câu hỏi, bình chọn, chấm điểm, điều khiển vòng, âm thanh và giao diện.
-- index.html phải tải styles.css và script.js độc lập; không còn script inline bị cắt.
+- Kiểm tra khởi chạy, đọc câu hỏi, timer, vote, chấm điểm, điều khiển vòng, âm thanh và giao diện.
+- Checklist này chưa được tự chạy trên trình duyệt; cần đánh dấu pass/fail khi bạn chạy thực tế.
 
-Ghi chú về kiểm thử
-- Repo hiện không có package.json, test runner hay môi trường trình duyệt tự động.
-- Các mục dưới đây là checklist kiểm thử chức năng cho trình duyệt. Cần chạy sau khi deploy/local serve; không ghi nhận là đã chạy thực tế trong browser.
-- Chạy bằng server tĩnh ở thư mục repo (ví dụ: python3 -m http.server 8000), mở http://localhost:8000, rồi mở DevTools Console để xác nhận không có lỗi JavaScript.
+Thiết lập
+- Chạy server tĩnh tại repo (python3 -m http.server 8000), mở http://localhost:8000 và DevTools Console.
+- Không cần API key cho các case mock. Kiểm tra trình duyệt có Web Speech API; nếu không có thì dùng voice toggle để kiểm tra fallback.
 
-A. Tải trang / khởi chạy
-1. Mở trang mới: màn hình chào và nút BẮT ĐẦU CHƠI hiện; Console không lỗi; CSS và JS tải thành công.
-2. Bấm BẮT ĐẦU CHƠI: màn hình chào biến mất, câu 1/10 và nội dung câu hỏi/4 đáp án được hiện, timer bắt đầu từ 20.
-3. Bấm BẮT ĐẦU CHƠI nhiều lần khi đang chơi: không tạo nhiều timer chạy song song; chỉ còn một vòng và timer.
+A. Bootstrap
+1. Mở trang: start screen/nút BẮT ĐẦU hiện, các file CSS/JS tải, Console không có lỗi.
+2. Bấm bắt đầu: start screen đóng, câu 1 và 4 đáp án hiện; không còn lỗi null element.
+3. Bấm bắt đầu nhiều lần trong lúc chơi không tạo nhiều timer hay vòng song song.
 
-B. Nhận bình chọn và chat mock
-4. Gửi A, B, C, D từ ô chat: chat history thêm tên user và nội dung; tỷ lệ vote cập nhật; participant list tăng.
-5. Gửi nội dung không phải A-D: chat vẫn lưu lịch sử nhưng không tính vote.
-6. Gửi lựa chọn nhiều lần từ cùng một mock user trong cùng câu: chỉ giữ lựa chọn cuối của user; tổng số vote không bị nhân đôi.
-7. Gửi 5 tin mock liên tục: tên user theo lượt Minh Anh, Tuấn Kiệt, Hoàng Nam, Bảo Ngọc, Bạn (Test); tin thứ 6 quay lại user đầu.
-8. Chat history tự cuộn xuống tin mới nhất và giữ giới hạn 100 tin.
+B. Đọc câu hỏi và timer
+4. Voice bật: khi câu hỏi/4 đáp án đang được đọc, timer đứng ở 20 và không nhận vote.
+5. Sau event speechSynthesis utterance end, timer bắt đầu đếm đủ 20 giây và mới nhận vote.
+6. Tắt voice khi đang đọc: speech dừng và timer bắt đầu ngay; bật voice lại trong giai đoạn đọc thì timer chờ đến khi đọc xong.
+7. Không hỗ trợ speechSynthesis hoặc voice tắt: timer/vote bắt đầu ngay, không treo ở trạng thái reading.
+8. Pause/resume trong lúc đọc: timer không chạy trước khi đọc kết thúc; sau resume đọc xong mới có 20 giây.
+9. Pause/resume lúc trả lời: giữ số giây còn lại; không mất vote đã nhận.
 
-C. Timer, điểm, chuyển câu
-9. Để timer về 0: chốt câu, khóa vote, đánh dấu đáp án đúng/sai, hiển thị số người đúng và cộng 10 điểm cho mỗi người chọn đúng.
-10. Chọn đáp án sai: không cộng điểm; người chơi vẫn xuất hiện trong danh sách tham gia.
-11. Bấm Câu tiếp khi đang nhận đáp án: câu hiện tại được chốt/chấm điểm đúng một lần, sau đó câu kế tiếp hiện ngay; timer cũ không được chạy.
-12. Bấm Câu tiếp sau khi lộ đáp án: bỏ thời gian chờ 4 giây, chuyển đúng một câu; không chấm điểm lặp.
-13. Qua câu 10: vòng kết thúc; không quay về câu 1 tự động; hiện overlay và nút BẮT ĐẦU VÒNG MỚI.
+C. Người chơi / định danh / vote
+10. Gửi A/B/C/D: chat có tin, vote bar cập nhật và mỗi người chơi chỉ có một dòng.
+11. Gửi nội dung khác A-D: chỉ thêm chat, không tính vote.
+12. Hai tin cùng tên nhưng khác userId (ví dụ id-1 và id-2, nickname "Minh Anh"): participant chỉ có một dòng “Minh Anh”; vote là lựa chọn mới nhất; điểm cộng dồn chung.
+13. Tên khác dấu/khoảng trắng thừa nhưng cùng tên chuẩn hóa (“Minh Ánh” không được coi cùng “Minh Anh”; “ Minh Anh ” và “minh anh” được gộp): danh sách không nhân đôi.
+14. Mock ID được tạo ổn định từ normalizeName(name), không tăng ID theo mỗi tin; gửi nhiều lần một tên mock vẫn giữ đúng người và lựa chọn cuối.
+15. Cùng người trả lời đúng ở nhiều câu: tổng điểm tăng 10 mỗi câu, leaderboard/participants/top 3 hiển thị một dòng với tổng điểm.
+16. Chat tự cuộn và giới hạn tối đa 100 tin.
 
-D. Tạm dừng / kết thúc / vòng mới
-14. Tạm dừng khi đang trả lời: timer ngừng; vote bị khóa; bấm Tiếp tục thì tiếp tục câu hiện tại với thời gian còn lại.
-15. Tạm dừng sau khi lộ đáp án: thời gian chờ sang câu kế ngừng; Tiếp tục hoàn tất chuyển câu.
-16. Kết thúc giữa vòng: timer/timeout dừng; không nhận vote/chấm điểm sau đó; overlay kết thúc hiện.
-17. Bắt đầu vòng mới sau kết thúc: quay về câu 1 và timer mới; điểm/người chơi được giữ; chat cũ được xóa.
-18. Bấm kết thúc ở câu 10 và tự hoàn tất sau câu 10: cả hai đường đều hiện overlay kết thúc.
+D. Chốt đáp án / chuyển câu
+17. Khi timer về 0: khóa vote, đánh dấu đúng/sai, cộng 10 cho từng tên có lựa chọn đúng; chỉ chấm một lần.
+18. Sau khi hiện kết quả, voice đọc đáp án đúng và số người đúng; câu kế tiếp chưa xuất hiện trong lúc đọc.
+19. Khi phần tổng kết speech kết thúc, mới tự chuyển đúng một câu; khi voice tắt/không khả dụng thì chuyển ngay theo fallback.
+20. Nút Câu tiếp trong lúc đọc câu hỏi hoặc đang trả lời: chốt câu không cộng lặp và chuyển câu theo yêu cầu nút.
+21. Qua câu 10: giữ kết quả và điểm, hiện thông báo kết thúc không che bảng điểm; đếm ngược 15 giây.
 
-E. Âm thanh / giọng đọc
-19. Bật nhạc sau thao tác người dùng: Web Audio tạo giai điệu quiz; bấm lần nữa thì dừng; không yêu cầu tải file nhạc có bản quyền.
-20. Bắt đầu câu hỏi khi giọng đọc bật: Web Speech đọc câu hỏi và các lựa chọn bằng vi-VN nếu thiết bị có voice phù hợp.
-21. Tắt giọng đọc: dừng speech hiện tại và không đọc câu sau; bật lại thì đọc câu hiện tại nếu đang nhận đáp án.
-22. Khi hết giờ: đọc đáp án đúng; khi pause/end/new round thì không được để speech cũ tiếp tục lẫn với vòng/câu mới.
-23. Kiểm tra trên Chrome/Edge desktop và trình duyệt mobile mục tiêu; voice tiếng Việt phụ thuộc engine/voice cài trên thiết bị.
+E. Kết thúc / vòng mới
+22. Bấm Kết thúc giữa vòng: timer và speech dừng; điểm/leaderboard vẫn nhìn thấy; panel kết thúc nằm trong luồng game, không phủ toàn màn hình.
+23. Đếm ngược hiển thị giảm từ 15 giây; đủ 15 giây tự mở vòng mới ở câu 1.
+24. Bấm BẮT ĐẦU VÒNG MỚI trước hạn: hủy auto restart cũ và bắt đầu ngay; giữ điểm/người chơi, xóa chat vòng cũ.
+25. Kết thúc liên tục hoặc bấm nút mới nhiều lần không tạo nhiều countdown/timeout.
 
-F. Giao diện và kết nối Live
-24. Kiểm tra viewport điện thoại dọc/ngang và chiều cao thấp: nút điều khiển, câu hỏi, chat, top 3 và toàn bộ người chơi không che nhau; vùng danh sách có thể cuộn.
-25. Mở/đóng modal cấu hình bằng nút Đóng, click nền modal; không nhập key thì hiện cảnh báo.
-26. Không có API key thật: thử WebSocket không bắt buộc. Với credentials hợp lệ và live đang hoạt động, xác minh open/message/close, trạng thái kết nối và cấu trúc payload theo EulerStream docs.
-27. Đóng/mất kết nối WebSocket: trạng thái về disconnected và ô mock hiện lại.
+F. Nhạc, live và responsive
+26. Nhạc bật/tắt sau thao tác người dùng, không lỗi nếu Web Audio không hỗ trợ.
+27. Mở/đóng modal, thiếu credentials báo lỗi; không đưa API key vào console.
+28. WebSocket open/message/error/close (chỉ với live và credential hợp lệ): trạng thái phù hợp, comment xử lý được; mock hiện lại khi ngắt.
+29. Kiểm tra viewport điện thoại dọc/ngang và chiều cao thấp: bảng điểm, câu hỏi, chat, input và panel kết thúc không chồng lấp; danh sách người chơi có thể cuộn.
 
-Kết quả cần ghi khi chạy
+Kết quả chạy
 - Browser/OS:
-- Commit/URL được test:
+- Commit/URL:
 - Console errors:
 - Pass/fail theo số test:
-- Các lỗi cần sửa:
+- Ghi chú/lỗi:

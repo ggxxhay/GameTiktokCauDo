@@ -16,12 +16,6 @@
       <button class="btn-start" id="startButton" type="button">BẮT ĐẦU CHƠI</button>
     </section>
 
-    <section class="start-screen" id="roundEndScreen" aria-labelledby="roundEndTitle" style="display:none">
-      <h2 id="roundEndTitle" style="color:var(--gold);margin-bottom:10px">🎉 Vòng chơi đã kết thúc</h2>
-      <p id="roundEndMessage" style="color:#a5b4fc;margin-bottom:20px">Sẵn sàng cho vòng tiếp theo?</p>
-      <button class="btn-start" id="newRoundButton" type="button">BẮT ĐẦU VÒNG MỚI</button>
-    </section>
-
     <header class="game-header">
       <div class="header-row">
         <div class="connection-status"><span id="statusDot" class="status-dot"></span><span id="statusText">Chế độ Chạy Thử</span></div>
@@ -45,6 +39,11 @@
     </header>
 
     <section class="game-area" aria-label="Câu hỏi và đáp án">
+      <section class="round-end-panel" id="roundEndPanel" aria-live="polite" hidden>
+        <h2>🎉 Vòng chơi đã kết thúc</h2>
+        <p id="roundEndMessage">Vòng mới sẽ tự bắt đầu sau 15 giây.</p>
+        <button class="btn-start" id="newRoundButton" type="button">BẮT ĐẦU VÒNG MỚI</button>
+      </section>
       <div class="timer-section">
         <div class="question-badge" id="qNumber">CÂU 1 / 10</div>
         <div class="timer-circle" id="timer" aria-live="polite">20</div>
