@@ -148,10 +148,8 @@ function toggleVoice() {
   $('voiceButton').setAttribute('aria-pressed', String(voiceEnabled));
   if (!voiceEnabled) {
     cancelSpeech();
-    if (gameState === 'running' && questionPhase === 'reading') startAnswerTimer();
-    else if (gameState === 'running' && questionPhase === 'results') scheduleAdvance(0);
   } else if (gameState === 'running' && questionPhase === 'reading') {
-    speakQuestion(questions[currentIdx], startAnswerTimer);
+    speakQuestion(questions[currentIdx], () => {});
   }
 }
 
@@ -215,12 +213,10 @@ function startNewRound() {
 }
 
 function startAnswerTimer() {
-  if (gameState !== 'running' || questionPhase !== 'reading') return;
-  questionPhase = 'answering';
-  isAcceptingAnswers = true;
+  if (gameState !== 'running' || questionPhase !== 'answering') return;
+  if (timerInterval) return;
   timeLeft = questionDuration;
   $('timer').textContent = timeLeft;
-  $('ticker').textContent = `👉 Đã đọc xong — còn ${questionDuration} giây để bình luận A, B, C hoặc D!`;
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     if (gameState !== 'running' || questionPhase !== 'answering') return;
@@ -267,15 +263,14 @@ function loadQuestion() {
     grid.append(row);
   });
   currentVotes = Object.create(null);
-  isAcceptingAnswers = false;
-  questionPhase = 'reading';
+  questionPhase = 'answering';
+  isAcceptingAnswers = true;
   timeLeft = questionDuration;
   $('timer').textContent = timeLeft;
-  $('ticker').textContent = voiceEnabled && 'speechSynthesis' in window
-    ? '🔊 Đang đọc câu hỏi và đáp án; bình luận sẽ được tính sau khi đọc xong...'
-    : `👉 Gõ A, B, C hoặc D; có ${questionDuration} giây để trả lời!`;
+  $('ticker').textContent = '👉 Câu hỏi đã hiện — Gõ A, B, C hoặc D để trả lời!';
   clearRoundTimers();
-  speakQuestion(item, startAnswerTimer);
+  startAnswerTimer();
+  if (voiceEnabled) speakQuestion(item, () => {});
 }
 
 function appendChatMessage(nickname, text, choice = null) {
@@ -319,13 +314,7 @@ function handleIncomingComment(userId, nickname, text) {
   const name = String(nickname || 'Viewer').trim() || 'Viewer';
   const choice = extractChoice(text);
   appendChatMessage(name, text.trim(), choice);
-  if (!choice) return false;
-  if (gameState !== 'running' || !isAcceptingAnswers) {
-    if (gameState === 'running' && questionPhase === 'reading') {
-      $('ticker').textContent = `💬 Đã nhận bình luận của ${name}; bình chọn mở sau khi đọc câu hỏi xong.`;
-    }
-    return false;
-  }
+  if (!choice || gameState !== 'running' || !isAcceptingAnswers) return false;
   const id = getParticipantKey(userId, name);
   if (!participants.has(id)) participants.set(id, { name, score: 0 });
   else participants.get(id).name = name;
@@ -391,15 +380,10 @@ function nextQuestionNow() {
   if (gameState !== 'running') return;
   clearRoundTimers();
   cancelSpeech();
-  if (questionPhase === 'reading') {
-    questionPhase = 'answering';
-    isAcceptingAnswers = true;
-  }
   if (questionPhase === 'answering') revealAnswer();
   clearTimeout(nextQuestionTimeout);
   nextQuestionTimeout = null;
   currentIdx += 1;
-  questionPhase = 'idle';
   loadQuestion();
 }
 
@@ -436,8 +420,6 @@ function togglePause() {
   } else if (pausedFrom === 'results') {
     const remaining = Math.max(0, nextQuestionAt - Date.now());
     nextQuestionTimeout = setTimeout(advanceQuestion, remaining);
-  } else if (pausedFrom === 'reading') {
-    if (!('speechSynthesis' in window) || !voiceEnabled) startAnswerTimer();
   }
   pausedFrom = null;
 }
@@ -532,9 +514,9 @@ function findLiveComment(payload) {
     const text = firstNonEmptyString(
       node.comment, node.text, node.content, node.commentText, node.messageText,
       typeof node.message === 'string' ? node.message : null,
-      node.comment && node.comment.text,
-      node.message && node.message.comment,
-      node.data && node.data.comment
+      node.comment && typeof node.comment === 'object' ? node.comment.text : null,
+      node.message && typeof node.message === 'object' ? node.message.comment : null,
+      node.data && typeof node.data === 'object' ? node.data.comment : null
     );
     if (text) {
       const nickname = firstNonEmptyString(
@@ -566,14 +548,10 @@ function handleLiveFrame(raw) {
   }
   if (config.debugLiveMessages) console.debug('TikTok Live frame:', payload);
   const events = Array.isArray(payload) ? payload : [payload];
-  let found = false;
   events.forEach(event => {
     const comment = findLiveComment(event);
-    if (!comment) return;
-    found = true;
-    handleIncomingComment(comment.userId, comment.nickname, comment.text);
+    if (comment) handleIncomingComment(comment.userId, comment.nickname, comment.text);
   });
-  if (!found && config.debugLiveMessages) console.debug('Frame chưa nhận diện là comment; kiểm tra cấu trúc payload trong Console.');
 }
 
 function connectTikTok() {
@@ -625,8 +603,7 @@ $('endButton').addEventListener('click', () => finishGame());
 $('musicButton').addEventListener('click', toggleMusic);
 $('voiceButton').addEventListener('click', toggleVoice);
 $('configButton').addEventListener('click', openModal);
-$('closeModalButton').addEventListener('click', closeModal);
-$('connectButton').addEventListener('click', connectTikTok);
+$('closeModalButton').addEventListener('click', connectTikTok);
 $('sendButton').addEventListener('click', simulateChat);
 $('simInput').addEventListener('keydown', event => { if (event.key === 'Enter') simulateChat(); });
 $('configModal').addEventListener('click', event => { if (event.target === $('configModal')) closeModal(); });

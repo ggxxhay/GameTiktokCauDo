@@ -1,21 +1,15 @@
 GAME TIKTOK CAU DO - TEST CASES / KIỂM THỬ
 
-A. Cấu hình và nạp trang
-1. Kiểm tra config.js được tải trước script.js, CSS và JS không báo lỗi.
-2. Sửa answerDurationSeconds trong config.js: timer dùng đúng giá trị mới.
-3. Với cấu hình mặc định, timer chỉ bắt đầu sau khi đọc xong câu hỏi và các đáp án, sau đó đếm 10 giây.
-4. Tắt voice hoặc không có SpeechSynthesis: timer bắt đầu ngay theo fallback.
+A. Nhận đáp án
+1. Khi câu xuất hiện, giai đoạn bình chọn mở ngay; A/B/C/D được nhận dù giọng đọc chưa đọc xong.
+2. Timer bắt đầu ngay cùng lúc câu xuất hiện; 10 giây không chờ giọng đọc kết thúc.
+3. Gửi nhiều bình luận `A` cho cùng hoặc khác người trong vòng câu: chỉ giữ lựa chọn cuối của mỗi người.
+4. Nội dung `A!`, `chọn A`, `đáp án B` được parse; tin không phải lựa chọn không tính vote.
 
-B. Bình luận / nhận vote
-5. Trong lúc câu hỏi đang được đọc: bình luận hiện ở chat nhưng chưa tính vote.
-6. Sau khi đọc xong: bình luận A, B, C, D ở TikTok Live được hiện trong chat, cập nhật vote bar và participants.
-7. Thử nội dung `A`, `A!`, `chọn A`, `đáp án B`; lựa chọn được parse đúng. Nội dung không có lựa chọn không tính vote.
-8. Bật GAME_CONFIG.debugLiveMessages trong config.js; xem Console để kiểm tra payload raw từ phiên Live nếu bình luận vẫn chưa nhận diện.
-9. Kiểm tra comment payload phẳng và lồng trong data/payload/event/message; lỗi parse không làm ngắt trang.
-10. Cùng tên với userId khác nhau vẫn gộp thành một participant; lựa chọn cuối trong câu được dùng.
+B. Live
+5. Bật debugLiveMessages trong config.js để kiểm tra payload WebSocket nếu Live chưa nhận comment.
+6. Comment payload phẳng hoặc lồng data/payload/event/message đều được thử nhận diện.
 
-C. Kết quả / vòng mới
-11. Đáp án đúng cộng 10 điểm một lần; kết quả được đọc xong mới chuyển câu.
-12. Kết thúc vòng: leaderboard vẫn hiện; auto restart sau roundRestartSeconds; nút bắt đầu vòng mới hoạt động ngay.
-
-Lưu ý: Checklist chưa được chạy trên tài khoản TikTok Live thật; cần kiểm tra payload thực tế của tài khoản/endpoint EulerStream.
+C. Kết quả
+7. Hết 10 giây, chốt đáp án; cộng 10 điểm một lần cho người chọn đúng.
+8. Câu kế tiếp không hiện trước khi phần tổng kết speech kết thúc.
